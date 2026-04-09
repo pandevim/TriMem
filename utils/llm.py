@@ -48,6 +48,7 @@ class VLLMBackend:
             max_model_len=MAX_MODEL_LEN,
             trust_remote_code=True,
         )
+        self.tokenizer = self.llm.get_tokenizer()
         print(f"[LLM] vLLM engine ready in {time.time() - t0:.1f}s", flush=True)
 
     def chat(
@@ -73,14 +74,11 @@ class VLLMBackend:
         out = outputs[0]
         tokens_in = len(out.prompt_token_ids)
         tokens_out = len(out.outputs[0].token_ids)
-        raw_text = out.outputs[0].text
-        # vLLM may strip <think>/</think> via skip_special_tokens.
-        # Decode with token IDs to preserve </think> for parse_action.
-        if "</think>" not in raw_text:
-            tokenizer = self.llm.get_tokenizer()
-            raw_text = tokenizer.decode(
-                out.outputs[0].token_ids, skip_special_tokens=False
-            )
+        # Decode with skip_special_tokens=False to preserve <think>/</ think>
+        # tags that parse_action needs for chain-of-thought models (Qwen, DeepSeek).
+        raw_text = self.tokenizer.decode(
+            out.outputs[0].token_ids, skip_special_tokens=False
+        )
         print(f"done in {latency:.0f}ms "
               f"(in={tokens_in}, out={tokens_out})", flush=True)
         return LLMResponse(
