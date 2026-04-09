@@ -12,6 +12,10 @@ import os
 import sys
 import time
 
+# Fix for vLLM multiprocessing: __spec__ must exist on __main__
+if not hasattr(sys.modules["__main__"], "__spec__"):
+    sys.modules["__main__"].__spec__ = None
+
 sys.path.insert(0, os.path.dirname(__file__))
 
 from benchmarks.alfworld_sim import ALFWorldSim, get_tasks
