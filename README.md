@@ -412,7 +412,7 @@ tri-mem/
 │   └── rag_agent.py                   # Phase 2: RAG-augmented agent
 │
 ├── benchmarks/
-│   └── alfworld_sim.py                # Simulated ALFWorld environment
+│   └── novacorp_audit_sim.py          # Simulated NovaCorp Audit environment
 │                                      #   - 10 task templates (heat, clean, cool, pick_and_place, slice, examine)
 │                                      #   - Strict syntax parsing (mirrors real ALFWorld)
 │                                      #   - Drop-in replaceable with real ALFWorld

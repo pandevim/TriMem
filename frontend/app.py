@@ -13,7 +13,7 @@ from flask_cors import CORS
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 
-from benchmarks.alfworld_sim import ALFWorldSim, get_tasks, TASK_TEMPLATES
+from benchmarks.novacorp_audit_sim import NovaCorpAuditSim, get_tasks, TASK_TEMPLATES
 from configs.settings import FRONTEND_PORT
 
 app = Flask(__name__)

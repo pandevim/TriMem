@@ -18,7 +18,7 @@ if not hasattr(sys.modules["__main__"], "__spec__"):
 
 sys.path.insert(0, os.path.dirname(__file__))
 
-from benchmarks.alfworld_sim import ALFWorldSim, get_tasks
+from benchmarks.novacorp_audit_sim import NovaCorpAuditSim, get_tasks
 from utils.metrics import TaskMetric, BenchmarkResult, TurnMetric
 from configs.settings import MAX_AGENT_TURNS
 
@@ -36,8 +36,8 @@ def make_agent(name: str):
 
 def run_task(agent, task: dict, task_num: int = 0,
              total_tasks: int = 0, verbose: bool = True) -> TaskMetric:
-    """Run a single ALFWorld task with the given agent."""
-    env = ALFWorldSim(task)
+    """Run a single audit task with the given agent."""
+    env = NovaCorpAuditSim(task)
     agent.reset(task["goal"])
 
     task_metric = TaskMetric(
