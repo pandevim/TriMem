@@ -30,7 +30,8 @@ def make_agent(name: str):
         raise ValueError(f"Unknown agent: {name}")
 
 
-def run_task(agent, task: dict, verbose: bool = True) -> TaskMetric:
+def run_task(agent, task: dict, task_num: int = 0,
+             total_tasks: int = 0, verbose: bool = True) -> TaskMetric:
     """Run a single ALFWorld task with the given agent."""
     env = ALFWorldSim(task)
     agent.reset(task["goal"])
@@ -44,20 +45,27 @@ def run_task(agent, task: dict, verbose: bool = True) -> TaskMetric:
     obs = env.reset()
     t_start = time.time()
 
+    progress = f"[{task_num}/{total_tasks}]" if total_tasks else ""
     if verbose:
-        print(f"\n{'='*60}")
-        print(f"Task: {task['goal']}")
-        print(f"Agent: {agent.name}")
-        print(f"{'='*60}")
-        print(f"[ENV] {obs[:120]}...")
+        print(f"\n{'='*60}", flush=True)
+        print(f"Task {progress}: {task['goal']}", flush=True)
+        print(f"Agent: {agent.name} | Type: {task['type']} | ID: {task['run_id']}", flush=True)
+        print(f"{'='*60}", flush=True)
+        print(f"[ENV] {obs[:120]}...", flush=True)
 
     for turn in range(MAX_AGENT_TURNS):
+        if verbose:
+            elapsed = time.time() - t_start
+            print(f"  [Turn {turn:02d}/{MAX_AGENT_TURNS}] "
+                  f"(elapsed: {elapsed:.1f}s) Thinking …",
+                  end=" ", flush=True)
+
         try:
             action, metric = agent.act(obs, turn)
         except Exception as e:
             task_metric.finalize(False, f"Agent error: {e}")
             if verbose:
-                print(f"[ERROR] {e}")
+                print(f"\n[ERROR] {e}", flush=True)
             break
 
         obs, done, success = env.step(action)
@@ -69,7 +77,7 @@ def run_task(agent, task: dict, verbose: bool = True) -> TaskMetric:
 
         if verbose:
             status = "✓" if not metric.syntactic_error else "✗"
-            print(f"  T{turn:02d} {status} {action:40s} → {obs[:60]}")
+            print(f"{status} {action:40s} → {obs[:60]}", flush=True)
 
         if done:
             task_metric.finalize(success)
@@ -82,38 +90,52 @@ def run_task(agent, task: dict, verbose: bool = True) -> TaskMetric:
     if verbose:
         result = "SUCCESS" if task_metric.success else f"FAILED ({task_metric.failure_reason})"
         print(f"Result: {result} | Turns: {task_metric.total_turns} | "
+              f"Duration: {task_metric.duration_s:.1f}s | "
               f"Tokens: {task_metric.total_tokens_in + task_metric.total_tokens_out} | "
-              f"Syntax errors: {task_metric.syntactic_errors}")
+              f"Syntax errors: {task_metric.syntactic_errors}", flush=True)
 
     return task_metric
 
 
 def run_benchmark(agent_name: str, num_tasks: int, verbose: bool = True) -> BenchmarkResult:
     """Run the full benchmark suite for one agent type."""
+    print(f"\n[INIT] Creating {agent_name} agent …", flush=True)
     agent = make_agent(agent_name)
+    print(f"[INIT] Loading {num_tasks} tasks …", flush=True)
     tasks = get_tasks(num_tasks)
     result = BenchmarkResult(agent_type=agent_name)
 
-    print(f"\n{'#'*60}")
-    print(f"  BENCHMARK: {agent_name.upper()} agent | {num_tasks} tasks")
-    print(f"{'#'*60}")
+    print(f"\n{'#'*60}", flush=True)
+    print(f"  BENCHMARK: {agent_name.upper()} agent | {num_tasks} tasks", flush=True)
+    print(f"{'#'*60}", flush=True)
 
-    for task in tasks:
-        task_metric = run_task(agent, task, verbose=verbose)
+    bench_start = time.time()
+    for i, task in enumerate(tasks, 1):
+        task_metric = run_task(agent, task, task_num=i,
+                               total_tasks=num_tasks, verbose=verbose)
         result.add_task(task_metric)
+        elapsed = time.time() - bench_start
+        done_count = i
+        avg_per_task = elapsed / done_count
+        remaining = avg_per_task * (num_tasks - done_count)
+        print(f"[PROGRESS] {done_count}/{num_tasks} tasks done | "
+              f"Elapsed: {elapsed:.1f}s | "
+              f"Est. remaining: {remaining:.1f}s", flush=True)
 
     # Save results
     os.makedirs("logs", exist_ok=True)
     ts = int(time.time())
     path = f"logs/{agent_name}_{ts}.json"
     result.save(path)
+    print(f"[SAVE] Results written to {path}", flush=True)
 
-    print(f"\n{'='*60}")
-    print(f"  SUMMARY: {agent_name.upper()}")
-    print(f"{'='*60}")
+    total_elapsed = time.time() - bench_start
+    print(f"\n{'='*60}", flush=True)
+    print(f"  SUMMARY: {agent_name.upper()} ({total_elapsed:.1f}s total)", flush=True)
+    print(f"{'='*60}", flush=True)
     for k, v in result.summary().items():
-        print(f"  {k:30s}: {v}")
-    print()
+        print(f"  {k:30s}: {v}", flush=True)
+    print(flush=True)
 
     return result
 

@@ -38,12 +38,17 @@ class LLMResponse:
 class VLLMBackend:
     def __init__(self):
         from vllm import LLM
+        print(f"[LLM] Initializing vLLM engine (model={MODEL_NAME}, "
+              f"gpu_mem={GPU_MEMORY_UTILIZATION}, max_len={MAX_MODEL_LEN}) …",
+              flush=True)
+        t0 = time.time()
         self.llm = LLM(
             model=MODEL_NAME,
             gpu_memory_utilization=GPU_MEMORY_UTILIZATION,
             max_model_len=MAX_MODEL_LEN,
             trust_remote_code=True,
         )
+        print(f"[LLM] vLLM engine ready in {time.time() - t0:.1f}s", flush=True)
 
     def chat(
         self,
@@ -59,15 +64,21 @@ class VLLMBackend:
             temperature=temperature,
             max_tokens=max_tokens,
         )
+        n_msgs = len(full_messages)
+        print(f"[LLM] Generating (vLLM, {n_msgs} messages) …", end=" ", flush=True)
         t0 = time.time()
         outputs = self.llm.chat(full_messages, sampling_params=sampling)
         latency = (time.time() - t0) * 1000
 
         out = outputs[0]
+        tokens_in = len(out.prompt_token_ids)
+        tokens_out = len(out.outputs[0].token_ids)
+        print(f"done in {latency:.0f}ms "
+              f"(in={tokens_in}, out={tokens_out})", flush=True)
         return LLMResponse(
             text=out.outputs[0].text.strip(),
-            tokens_in=len(out.prompt_token_ids),
-            tokens_out=len(out.outputs[0].token_ids),
+            tokens_in=tokens_in,
+            tokens_out=tokens_out,
             latency_ms=latency,
         )
 
@@ -80,9 +91,13 @@ class TransformersBackend:
         import torch
         from transformers import AutoModelForCausalLM, AutoTokenizer
 
+        print(f"[LLM] Loading tokenizer for {MODEL_NAME} …", flush=True)
         self.tokenizer = AutoTokenizer.from_pretrained(
             MODEL_NAME, trust_remote_code=True
         )
+        print(f"[LLM] Loading model weights (dtype=bfloat16, device_map=auto) …",
+              flush=True)
+        t0 = time.time()
         self.model = AutoModelForCausalLM.from_pretrained(
             MODEL_NAME,
             torch_dtype=torch.bfloat16,
@@ -90,6 +105,7 @@ class TransformersBackend:
             trust_remote_code=True,
         )
         self.model.eval()
+        print(f"[LLM] Model loaded in {time.time() - t0:.1f}s", flush=True)
 
     def chat(
         self,
@@ -108,6 +124,9 @@ class TransformersBackend:
         inputs = self.tokenizer(prompt_text, return_tensors="pt").to(self.model.device)
         tokens_in = inputs["input_ids"].shape[1]
 
+        n_msgs = len(full_messages)
+        print(f"[LLM] Generating (transformers, {n_msgs} messages, "
+              f"{tokens_in} prompt tokens) …", end=" ", flush=True)
         t0 = time.time()
         with torch.no_grad():
             generated = self.model.generate(
@@ -122,6 +141,8 @@ class TransformersBackend:
         text = self.tokenizer.decode(new_tokens, skip_special_tokens=True).strip()
         tokens_out = len(new_tokens)
 
+        print(f"done in {latency:.0f}ms "
+              f"(in={tokens_in}, out={tokens_out})", flush=True)
         return LLMResponse(
             text=text,
             tokens_in=tokens_in,
@@ -143,10 +164,10 @@ def get_llm():
         return _backend_instance
 
     if INFERENCE_BACKEND == "vllm":
-        print(f"[LLM] Loading {MODEL_NAME} via vLLM …")
+        print(f"[LLM] Loading {MODEL_NAME} via vLLM …", flush=True)
         _backend_instance = VLLMBackend()
     elif INFERENCE_BACKEND == "transformers":
-        print(f"[LLM] Loading {MODEL_NAME} via transformers …")
+        print(f"[LLM] Loading {MODEL_NAME} via transformers …", flush=True)
         _backend_instance = TransformersBackend()
     else:
         raise ValueError(
@@ -154,5 +175,5 @@ def get_llm():
             "Use 'vllm' or 'transformers'."
         )
 
-    print(f"[LLM] Ready.")
+    print(f"[LLM] Ready.", flush=True)
     return _backend_instance

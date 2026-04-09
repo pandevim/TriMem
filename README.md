@@ -438,6 +438,10 @@ tri-mem/
 ├── router/                            # Phase 4 (empty, to be built)
 │
 ├── utils/
+│   ├── llm.py                         # Unified LLM inference wrapper
+│   │                                  #   - VLLMBackend (fast GPU inference)
+│   │                                  #   - TransformersBackend (universal HF fallback)
+│   │                                  #   - Singleton pattern — model loads once, shared across agents
 │   └── metrics.py                     # TurnMetric, TaskMetric, BenchmarkResult
 │                                      #   - Tracks per-turn: tokens, latency, memory source,
 │                                      #     entropy score, syntactic errors, spatial hallucinations
@@ -561,7 +565,7 @@ python frontend/app.py
 1. Implement screenshot/text-to-image rendering for agent observations
 2. Build the Segment Optical Caching tile manager (compress, store, retrieve image patches)
 3. Create `VisualBusAgent` that uses vision model to read compressed history
-4. Requires switching to a multimodal model endpoint (or using Claude's vision capability)
+4. Requires switching to a multimodal open-source model (e.g., Qwen-VL)
 5. Key measurement: does the token cost curve flatten while maintaining success rate?
 
 ### Then: Phase 4 — Entropy Router
