@@ -164,6 +164,12 @@ def get_llm():
         return _backend_instance
 
     if INFERENCE_BACKEND == "vllm":
+        import torch
+        if not torch.cuda.is_available():
+            print("[LLM] WARNING: CUDA not available, falling back to transformers backend.", flush=True)
+            _backend_instance = TransformersBackend()
+            print(f"[LLM] Ready.", flush=True)
+            return _backend_instance
         print(f"[LLM] Loading {MODEL_NAME} via vLLM …", flush=True)
         _backend_instance = VLLMBackend()
     elif INFERENCE_BACKEND == "transformers":
