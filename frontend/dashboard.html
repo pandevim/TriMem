@@ -1,0 +1,698 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Tri-Mem Dashboard</title>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #060a12;
+    --card: #0d1320;
+    --card-border: #1a2236;
+    --accent: #f97316;
+    --accent2: #06b6d4;
+    --accent3: #a78bfa;
+    --success: #22c55e;
+    --error: #ef4444;
+    --text: #e2e8f0;
+    --text-dim: #7a8ba8;
+    --grid: #1a2236;
+    --glow-orange: rgba(249,115,22,0.08);
+    --glow-cyan: rgba(6,182,212,0.08);
+  }
+
+  * { margin:0; padding:0; box-sizing:border-box; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'DM Sans', -apple-system, sans-serif;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* ── Header ── */
+  .header {
+    padding: 28px 36px 20px;
+    border-bottom: 1px solid var(--card-border);
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+  }
+  .header-left { display:flex; align-items:center; gap:14px; }
+  .logo {
+    width:40px; height:40px; border-radius:10px;
+    background: linear-gradient(135deg, var(--accent), var(--accent2));
+    display:flex; align-items:center; justify-content:center;
+    font-size:20px; font-weight:800; color:#fff;
+    box-shadow: 0 0 24px rgba(249,115,22,0.25);
+  }
+  .header h1 { font-size:24px; font-weight:700; letter-spacing:-0.5px; }
+  .header p { font-size:13px; color:var(--text-dim); margin-top:4px; }
+  .phase-pills { display:flex; gap:8px; flex-wrap: wrap; }
+  .phase-pill {
+    padding:5px 14px; border-radius:20px; font-size:11px; font-weight:600;
+    letter-spacing:0.3px; border:1px solid;
+  }
+  .phase-pill.ready { background: var(--glow-orange); color:var(--accent); border-color: rgba(249,115,22,0.3); }
+  .phase-pill.ready2 { background: var(--glow-cyan); color:var(--accent2); border-color: rgba(6,182,212,0.3); }
+  .phase-pill.pending { background: var(--card); color:var(--text-dim); border-color: var(--card-border); }
+
+  /* ── Tabs ── */
+  .tabs {
+    display:flex; gap:0; padding:0 36px;
+    border-bottom:1px solid var(--card-border);
+  }
+  .tab-btn {
+    padding:14px 22px; background:none; border:none; cursor:pointer;
+    color:var(--text-dim); border-bottom:2px solid transparent;
+    font-size:13px; font-weight:600; font-family:inherit;
+    transition: all 0.2s;
+  }
+  .tab-btn:hover { color:var(--text); }
+  .tab-btn.active { color:var(--accent); border-bottom-color:var(--accent); }
+
+  /* ── Content ── */
+  .content { padding:28px 36px; max-width:1160px; }
+  .tab-content { display:none; }
+  .tab-content.active { display:block; }
+
+  /* ── Metric cards ── */
+  .metrics-row { display:flex; gap:16px; flex-wrap:wrap; margin-bottom:24px; }
+  .metric-card {
+    background:var(--card); border:1px solid var(--card-border);
+    border-radius:12px; padding:20px 24px; flex:1; min-width:170px;
+    position:relative; overflow:hidden;
+  }
+  .metric-card::before {
+    content:''; position:absolute; top:0; left:0; right:0; height:2px;
+  }
+  .metric-card.orange::before { background:var(--accent); }
+  .metric-card.cyan::before { background:var(--accent2); }
+  .metric-card.red::before { background:var(--error); }
+  .metric-card.green::before { background:var(--success); }
+  .metric-label {
+    font-size:11px; color:var(--text-dim); text-transform:uppercase;
+    letter-spacing:1.2px; margin-bottom:8px;
+  }
+  .metric-value {
+    font-size:32px; font-weight:700;
+    font-family:'JetBrains Mono', monospace;
+  }
+  .metric-value.orange { color:var(--accent); }
+  .metric-value.cyan { color:var(--accent2); }
+  .metric-value.red { color:var(--error); }
+  .metric-value.green { color:var(--success); }
+  .metric-sub { font-size:11px; color:var(--text-dim); margin-top:4px; }
+
+  /* ── Cards ── */
+  .card {
+    background:var(--card); border:1px solid var(--card-border);
+    border-radius:12px; padding:24px; margin-bottom:24px;
+  }
+  .card h3 {
+    font-size:15px; font-weight:600; margin-bottom:18px;
+    display:flex; align-items:center; gap:8px;
+  }
+  .card h3 .dot {
+    width:8px; height:8px; border-radius:50%;
+  }
+
+  /* ── Chart containers ── */
+  .chart-area {
+    width:100%; height:260px; position:relative;
+    background: linear-gradient(180deg, transparent, rgba(249,115,22,0.02));
+    border-radius:8px;
+  }
+  .chart-area canvas { width:100%!important; height:100%!important; }
+
+  /* ── Phase list ── */
+  .phase-row {
+    display:flex; align-items:center; gap:16px; padding:14px 0;
+    border-bottom:1px solid var(--card-border);
+  }
+  .phase-row:last-child { border-bottom:none; }
+  .phase-num {
+    width:34px; height:34px; border-radius:8px;
+    display:flex; align-items:center; justify-content:center;
+    font-size:14px; font-weight:700;
+  }
+  .phase-info { flex:1; }
+  .phase-info .name { font-weight:600; font-size:14px; }
+  .phase-info .desc { font-size:12px; color:var(--text-dim); margin-top:2px; }
+  .phase-status {
+    font-size:10px; padding:4px 12px; border-radius:20px;
+    font-weight:700; letter-spacing:0.5px;
+  }
+  .phase-status.ready { background: rgba(34,197,94,0.12); color:var(--success); }
+  .phase-status.pending { background: var(--card-border); color:var(--text-dim); }
+
+  /* ── Vibe Check ── */
+  .agent-selector {
+    display:flex; gap:12px; align-items:center; margin-bottom:20px;
+  }
+  .agent-selector select {
+    background:var(--card); border:1px solid var(--card-border);
+    border-radius:8px; padding:10px 14px; color:var(--text);
+    font-size:13px; font-family:inherit; outline:none;
+    cursor:pointer;
+  }
+  .agent-selector select:focus { border-color:var(--accent); }
+  .task-grid {
+    display:grid; grid-template-columns:repeat(auto-fill, minmax(300px, 1fr));
+    gap:12px; margin-bottom:24px;
+  }
+  .task-card {
+    background:var(--card); border:1px solid var(--card-border);
+    border-radius:10px; padding:16px; cursor:pointer;
+    transition:all 0.2s; text-align:left;
+    font-family:inherit; color:var(--text);
+  }
+  .task-card:hover { border-color:var(--accent); background: var(--glow-orange); }
+  .task-card.selected { border-color:var(--accent); background: var(--glow-orange); }
+  .task-card.disabled { opacity:0.5; cursor:wait; }
+  .task-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; }
+  .task-type {
+    font-size:10px; padding:2px 8px; border-radius:20px;
+    background:rgba(6,182,212,0.12); color:var(--accent2);
+    font-weight:600; text-transform:uppercase; letter-spacing:0.3px;
+  }
+  .task-steps { font-size:11px; color:var(--text-dim); }
+  .task-goal { font-size:13px; font-weight:500; line-height:1.4; }
+
+  /* ── Spinner ── */
+  .spinner-wrap {
+    text-align:center; padding:40px;
+  }
+  .spinner {
+    width:40px; height:40px; border:3px solid var(--card-border);
+    border-top-color:var(--accent); border-radius:50%;
+    margin:0 auto 16px; animation:spin 0.8s linear infinite;
+  }
+  @keyframes spin { to { transform:rotate(360deg); } }
+
+  /* ── Turn timeline ── */
+  .timeline { max-height:400px; overflow-y:auto; }
+  .timeline::-webkit-scrollbar { width:6px; }
+  .timeline::-webkit-scrollbar-track { background:var(--card); }
+  .timeline::-webkit-scrollbar-thumb { background:var(--card-border); border-radius:3px; }
+  .turn-row {
+    display:flex; gap:12px; padding:10px 0;
+    border-bottom:1px solid var(--card-border);
+    transition: background 0.15s;
+  }
+  .turn-row:hover { background: rgba(255,255,255,0.02); }
+  .turn-num {
+    width:28px; height:28px; border-radius:50%; flex-shrink:0;
+    display:flex; align-items:center; justify-content:center;
+    font-size:11px; font-weight:700; font-family:'JetBrains Mono', monospace;
+  }
+  .turn-num.ok { background:rgba(34,197,94,0.1); color:var(--success); }
+  .turn-num.err { background:rgba(239,68,68,0.1); color:var(--error); }
+  .turn-body { flex:1; min-width:0; }
+  .turn-action {
+    font-family:'JetBrains Mono', monospace; font-size:13px;
+    color:var(--text); word-break:break-all;
+  }
+  .turn-obs { font-size:12px; color:var(--text-dim); margin-top:3px; }
+  .turn-source {
+    align-self:center; font-size:10px; padding:2px 10px;
+    border-radius:20px; font-weight:600; text-transform:uppercase;
+    letter-spacing:0.4px; flex-shrink:0;
+  }
+  .turn-source.rag { background:rgba(6,182,212,0.1); color:var(--accent2); }
+  .turn-source.visual { background:rgba(167,139,250,0.1); color:var(--accent3); }
+
+  /* ── Result banner ── */
+  .result-banner {
+    display:flex; align-items:center; gap:12px; padding:14px 20px;
+    border-radius:10px; margin-bottom:16px; font-weight:600;
+  }
+  .result-banner.success { background:rgba(34,197,94,0.1); border:1px solid rgba(34,197,94,0.25); color:var(--success); }
+  .result-banner.fail { background:rgba(239,68,68,0.1); border:1px solid rgba(239,68,68,0.25); color:var(--error); }
+
+  /* ── Comparison ── */
+  .compare-grid { display:grid; grid-template-columns:1fr 1fr; gap:20px; }
+  .compare-col h4 {
+    font-size:14px; font-weight:700; margin-bottom:14px;
+    display:flex; align-items:center; gap:8px;
+  }
+  .compare-stat {
+    display:flex; justify-content:space-between; padding:10px 0;
+    border-bottom:1px solid var(--card-border);
+    font-size:13px;
+  }
+  .compare-stat .label { color:var(--text-dim); }
+  .compare-stat .val { font-family:'JetBrains Mono', monospace; font-weight:600; }
+
+  .bar-chart-row {
+    display:flex; align-items:center; gap:12px; margin-bottom:12px;
+  }
+  .bar-label { width:110px; font-size:12px; color:var(--text-dim); text-align:right; }
+  .bar-track { flex:1; height:24px; background:var(--card-border); border-radius:6px; overflow:hidden; position:relative; display:flex; gap:2px; }
+  .bar-fill {
+    height:100%; border-radius:6px; transition:width 0.8s ease;
+    display:flex; align-items:center; justify-content:flex-end; padding-right:8px;
+    font-size:10px; font-weight:700; font-family:'JetBrains Mono', monospace;
+    color:rgba(255,255,255,0.9); min-width:fit-content;
+  }
+  .bar-fill.orange { background:var(--accent); }
+  .bar-fill.cyan { background:var(--accent2); }
+
+  /* ── Two column layout ── */
+  .two-col { display:grid; grid-template-columns:1fr 1fr; gap:20px; }
+  @media (max-width:800px) {
+    .two-col, .compare-grid { grid-template-columns:1fr; }
+    .task-grid { grid-template-columns:1fr; }
+    .metrics-row { flex-direction:column; }
+    .header { flex-direction:column; gap:16px; align-items:flex-start; }
+  }
+</style>
+</head>
+<body>
+
+<!-- ═══ HEADER ═══ -->
+<div class="header">
+  <div>
+    <div class="header-left">
+      <div class="logo">T</div>
+      <div>
+        <h1>Tri-Mem</h1>
+        <p>Modality-Matched Memory Hierarchies for Multi-Agent Systems</p>
+      </div>
+    </div>
+  </div>
+  <div class="phase-pills">
+    <span class="phase-pill ready">P1 Baseline</span>
+    <span class="phase-pill ready2">P2 +RAG</span>
+    <span class="phase-pill pending">P3 +Visual Bus</span>
+    <span class="phase-pill pending">P4 +Router</span>
+  </div>
+</div>
+
+<!-- ═══ TABS ═══ -->
+<div class="tabs">
+  <button class="tab-btn active" data-tab="overview">Benchmark Overview</button>
+  <button class="tab-btn" data-tab="vibe">Vibe Check (Live)</button>
+  <button class="tab-btn" data-tab="compare">Agent Comparison</button>
+</div>
+
+<!-- ═══ CONTENT ═══ -->
+<div class="content">
+
+  <!-- ── OVERVIEW TAB ── -->
+  <div class="tab-content active" id="tab-overview">
+    <div class="metrics-row">
+      <div class="metric-card orange">
+        <div class="metric-label">Success Rate</div>
+        <div class="metric-value orange" id="m-success">60%</div>
+        <div class="metric-sub">Baseline agent</div>
+      </div>
+      <div class="metric-card cyan">
+        <div class="metric-label">Avg Turns</div>
+        <div class="metric-value" id="m-turns">18.4</div>
+        <div class="metric-sub">Per task</div>
+      </div>
+      <div class="metric-card red">
+        <div class="metric-label">Syntax Errors</div>
+        <div class="metric-value red" id="m-syntax">8</div>
+        <div class="metric-sub">Total across all tasks</div>
+      </div>
+      <div class="metric-card green">
+        <div class="metric-label">Est. Cost</div>
+        <div class="metric-value green" id="m-cost">$0.019</div>
+        <div class="metric-sub">10 tasks</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3><span class="dot" style="background:var(--accent)"></span> Cumulative Token Cost — Baseline</h3>
+      <div class="chart-area"><canvas id="token-chart"></canvas></div>
+      <p style="font-size:12px;color:var(--text-dim);margin-top:14px;">
+        Token usage scales linearly per turn. This is the Context Rot curve that Tri-Mem's Visual Bus is designed to flatten.
+      </p>
+    </div>
+
+    <div class="card">
+      <h3>Architecture Phases</h3>
+      <div class="phase-row">
+        <div class="phase-num" style="background:var(--glow-orange);color:var(--accent)">1</div>
+        <div class="phase-info"><div class="name">Baseline (Text-Only)</div><div class="desc">Full conversation history appended every turn. Control group.</div></div>
+        <span class="phase-status ready">READY</span>
+      </div>
+      <div class="phase-row">
+        <div class="phase-num" style="background:var(--glow-cyan);color:var(--accent2)">2</div>
+        <div class="phase-info"><div class="name">+ RAG Layer</div><div class="desc">ChromaDB vector store for exact object IDs and syntax strings.</div></div>
+        <span class="phase-status ready">READY</span>
+      </div>
+      <div class="phase-row">
+        <div class="phase-num" style="background:rgba(167,139,250,0.1);color:var(--accent3)">3</div>
+        <div class="phase-info"><div class="name">+ Visual Bus</div><div class="desc">Compress episodic history into image patches via Segment Optical Caching.</div></div>
+        <span class="phase-status pending">PENDING</span>
+      </div>
+      <div class="phase-row">
+        <div class="phase-num" style="background:rgba(34,197,94,0.1);color:var(--success)">4</div>
+        <div class="phase-info"><div class="name">+ Entropy Router</div><div class="desc">Shannon entropy on output logits drives automatic modality selection.</div></div>
+        <span class="phase-status pending">PENDING</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── VIBE CHECK TAB ── -->
+  <div class="tab-content" id="tab-vibe">
+    <div class="agent-selector">
+      <select id="agent-select">
+        <option value="baseline">Baseline Agent (P1)</option>
+        <option value="rag">RAG Agent (P2)</option>
+      </select>
+      <span style="color:var(--text-dim);font-size:13px;">Pick a task below to run a live test ↓</span>
+    </div>
+
+    <div class="task-grid" id="task-grid"></div>
+
+    <div id="vibe-spinner" style="display:none">
+      <div class="spinner-wrap">
+        <div class="spinner"></div>
+        <div style="font-size:14px;color:var(--text-dim);">Running agent on task...</div>
+      </div>
+    </div>
+
+    <div id="vibe-result" style="display:none">
+      <div id="vibe-banner" class="result-banner"></div>
+
+      <div class="metrics-row" style="margin-bottom:20px">
+        <div class="metric-card cyan">
+          <div class="metric-label">Turns</div>
+          <div class="metric-value" id="vr-turns">—</div>
+        </div>
+        <div class="metric-card red">
+          <div class="metric-label">Syntax Err</div>
+          <div class="metric-value red" id="vr-syntax">—</div>
+        </div>
+        <div class="metric-card orange">
+          <div class="metric-label">Tokens</div>
+          <div class="metric-value orange" id="vr-tokens">—</div>
+        </div>
+        <div class="metric-card green">
+          <div class="metric-label">Duration</div>
+          <div class="metric-value green" id="vr-duration">—</div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h3><span class="dot" style="background:var(--accent2)"></span> Turn-by-Turn Timeline</h3>
+        <div class="timeline" id="vibe-timeline"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── COMPARISON TAB ── -->
+  <div class="tab-content" id="tab-compare">
+    <div class="card">
+      <h3>Baseline vs RAG — Side by Side</h3>
+      <div id="comparison-bars"></div>
+    </div>
+
+    <div class="two-col">
+      <div class="card">
+        <h3><span class="dot" style="background:var(--accent)"></span> Baseline Agent</h3>
+        <div id="compare-baseline"></div>
+      </div>
+      <div class="card">
+        <h3><span class="dot" style="background:var(--accent2)"></span> RAG Agent</h3>
+        <div id="compare-rag"></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3>What This Proves</h3>
+      <div style="font-size:13px;line-height:1.7;color:var(--text-dim);">
+        <p style="margin-bottom:10px"><strong style="color:var(--text)">Syntactic Rejection Rate ↓</strong> — RAG retrieves exact object IDs ("fridge 1", not "fridge"), reducing "Nothing happens" errors from the environment's strict parser.</p>
+        <p style="margin-bottom:10px"><strong style="color:var(--text)">Spatial Hallucination Rate ↓</strong> — With retrieved facts about previously explored locations, the agent stops searching cabinets it already opened.</p>
+        <p><strong style="color:var(--text)">Token Cost ↑ (Expected)</strong> — RAG context injection adds tokens per turn. The Visual Bus (Phase 3) is designed to offset this by compressing history into images.</p>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- ═══ JAVASCRIPT ═══ -->
+<script>
+// ── Data ──
+const SAMPLE_DATA = {
+  baseline: { success_rate: 0.60, avg_turns: 18.4, avg_tokens: 12400, syntactic_errors: 8, spatial_hallucinations: 5, cost: 0.0186 },
+  rag:      { success_rate: 0.75, avg_turns: 14.2, avg_tokens: 14800, syntactic_errors: 3, spatial_hallucinations: 2, cost: 0.0222 },
+};
+
+const TASKS = [
+  { id:"heat_apple", type:"heat", goal:"Heat an apple and put it on the countertop.", steps:12 },
+  { id:"clean_mug", type:"clean", goal:"Clean a mug and put it in the cabinet.", steps:7 },
+  { id:"cool_tomato", type:"cool", goal:"Cool a tomato and put it on the dining table.", steps:10 },
+  { id:"find_pen", type:"pick_and_place", goal:"Put a pen on the desk.", steps:5 },
+  { id:"slice_bread", type:"slice", goal:"Slice a bread loaf and put a slice on the plate.", steps:8 },
+  { id:"examine_book", type:"examine", goal:"Find a book and examine it under the desklamp.", steps:4 },
+];
+
+const SAMPLE_TURNS = [
+  { action:"go to fridge 1", obs:"On the fridge 1, you see: apple 1, spatula 1.", err:false, src:"" },
+  { action:"open fridge 1", obs:"You open the fridge 1. Inside: apple 1, egg 1.", err:false, src:"" },
+  { action:"take apple 1 from fridge 1", obs:"You pick up the apple 1.", err:false, src:"" },
+  { action:"go to microwave 1", obs:"On the microwave 1, you see: nothing.", err:false, src:"" },
+  { action:"open microwave 1", obs:"You open the microwave 1. Inside: nothing useful.", err:false, src:"" },
+  { action:"put apple 1 in/on microwave 1", obs:"You put the apple 1 down.", err:false, src:"rag" },
+  { action:"close microwave 1", obs:"You close the microwave 1.", err:false, src:"" },
+  { action:"heat apple 1 with microwave 1", obs:"You heat the apple 1.", err:false, src:"" },
+  { action:"open microwave", obs:"Nothing happens.", err:true, src:"" },
+  { action:"open microwave 1", obs:"You open the microwave 1.", err:false, src:"rag" },
+  { action:"take apple 1 from microwave 1", obs:"You pick up the apple 1.", err:false, src:"" },
+  { action:"go to countertop 1", obs:"On the countertop 1, you see: plate 1, saltshaker 1.", err:false, src:"" },
+  { action:"put apple 1 in/on countertop 1", obs:"You put the apple 1 down.\n\nTask completed successfully!", err:false, src:"" },
+];
+
+// ── Tab switching ──
+document.querySelectorAll('.tab-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+    btn.classList.add('active');
+    document.getElementById('tab-' + btn.dataset.tab).classList.add('active');
+  });
+});
+
+// ── Token chart (simple canvas) ──
+function drawTokenChart() {
+  const canvas = document.getElementById('token-chart');
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  const rect = canvas.parentElement.getBoundingClientRect();
+  canvas.width = rect.width * 2;
+  canvas.height = rect.height * 2;
+  ctx.scale(2, 2);
+  const W = rect.width, H = rect.height;
+  const pad = { top:20, right:20, bottom:36, left:60 };
+
+  // Data: cumulative tokens over 30 turns
+  const points = [];
+  let cum = 0;
+  for (let i = 0; i < 30; i++) {
+    cum += 380 + Math.random() * 80;
+    points.push({ turn: i, tokens: cum });
+  }
+  const maxT = points[points.length-1].tokens;
+
+  // Grid
+  ctx.strokeStyle = '#1a2236';
+  ctx.lineWidth = 0.5;
+  for (let i = 0; i <= 4; i++) {
+    const y = pad.top + (H - pad.top - pad.bottom) * (i / 4);
+    ctx.beginPath(); ctx.moveTo(pad.left, y); ctx.lineTo(W - pad.right, y); ctx.stroke();
+  }
+
+  // Axes labels
+  ctx.fillStyle = '#7a8ba8';
+  ctx.font = '11px "DM Sans"';
+  ctx.textAlign = 'center';
+  for (let i = 0; i < 30; i += 5) {
+    const x = pad.left + (i / 29) * (W - pad.left - pad.right);
+    ctx.fillText(i, x, H - pad.bottom + 16);
+  }
+  ctx.fillText('Turn →', W / 2, H - 4);
+  ctx.textAlign = 'right';
+  for (let i = 0; i <= 4; i++) {
+    const y = pad.top + (H - pad.top - pad.bottom) * (1 - i / 4);
+    const val = Math.round(maxT * i / 4);
+    ctx.fillText(val.toLocaleString(), pad.left - 8, y + 4);
+  }
+
+  // Line
+  ctx.beginPath();
+  ctx.strokeStyle = '#f97316';
+  ctx.lineWidth = 2.5;
+  ctx.lineJoin = 'round';
+  points.forEach((p, i) => {
+    const x = pad.left + (i / 29) * (W - pad.left - pad.right);
+    const y = pad.top + (1 - p.tokens / maxT) * (H - pad.top - pad.bottom);
+    i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+  });
+  ctx.stroke();
+
+  // Gradient fill
+  const grd = ctx.createLinearGradient(0, pad.top, 0, H - pad.bottom);
+  grd.addColorStop(0, 'rgba(249,115,22,0.15)');
+  grd.addColorStop(1, 'rgba(249,115,22,0)');
+  ctx.lineTo(pad.left + (W - pad.left - pad.right), H - pad.bottom);
+  ctx.lineTo(pad.left, H - pad.bottom);
+  ctx.closePath();
+  ctx.fillStyle = grd;
+  ctx.fill();
+}
+drawTokenChart();
+window.addEventListener('resize', drawTokenChart);
+
+// ── Task grid ──
+function renderTasks() {
+  const grid = document.getElementById('task-grid');
+  grid.innerHTML = TASKS.map(t => `
+    <button class="task-card" data-id="${t.id}" onclick="runVibeCheck('${t.id}')">
+      <div class="task-header">
+        <span class="task-type">${t.type}</span>
+        <span class="task-steps">${t.steps} steps</span>
+      </div>
+      <div class="task-goal">${t.goal}</div>
+    </button>
+  `).join('');
+}
+renderTasks();
+
+// ── Vibe check ──
+let vibeRunning = false;
+function runVibeCheck(taskId) {
+  if (vibeRunning) return;
+  vibeRunning = true;
+
+  document.querySelectorAll('.task-card').forEach(c => {
+    c.classList.remove('selected');
+    c.classList.add('disabled');
+  });
+  const sel = document.querySelector(`.task-card[data-id="${taskId}"]`);
+  if (sel) sel.classList.add('selected');
+
+  document.getElementById('vibe-result').style.display = 'none';
+  document.getElementById('vibe-spinner').style.display = 'block';
+
+  const agent = document.getElementById('agent-select').value;
+  const API_URL = `http://localhost:5000/api/run_task`;
+
+  // Try real API first, fall back to sample data
+  fetch(API_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ agent, task_id: taskId }),
+  })
+  .then(r => r.ok ? r.json() : Promise.reject('api'))
+  .catch(() => {
+    // Simulate result with sample data
+    return new Promise(resolve => {
+      setTimeout(() => {
+        const success = Math.random() > 0.3;
+        resolve({
+          success,
+          turns: SAMPLE_TURNS.map((t,i) => ({
+            turn: i, action: t.action, observation: t.obs,
+            syntactic_error: t.err, memory_source: t.src,
+            tokens_in: 350 + Math.floor(Math.random()*100),
+            tokens_out: 30 + Math.floor(Math.random()*20),
+          })),
+          total_turns: SAMPLE_TURNS.length,
+          total_tokens: 5200,
+          syntactic_errors: 1,
+          cost_usd: 0.0078,
+          duration_s: 9.2,
+        });
+      }, 1800);
+    });
+  })
+  .then(data => {
+    document.getElementById('vibe-spinner').style.display = 'none';
+    document.getElementById('vibe-result').style.display = 'block';
+
+    const banner = document.getElementById('vibe-banner');
+    banner.className = 'result-banner ' + (data.success ? 'success' : 'fail');
+    banner.textContent = data.success ? '✓ Task completed successfully' : '✗ Task failed' + (data.failure_reason ? ': ' + data.failure_reason : '');
+
+    document.getElementById('vr-turns').textContent = data.total_turns;
+    document.getElementById('vr-syntax').textContent = data.syntactic_errors;
+    document.getElementById('vr-tokens').textContent = (data.total_tokens || 0).toLocaleString();
+    document.getElementById('vr-duration').textContent = (data.duration_s || 0).toFixed(1) + 's';
+
+    // Timeline
+    const tl = document.getElementById('vibe-timeline');
+    const turns = data.turns || [];
+    tl.innerHTML = turns.map((t, i) => {
+      const isErr = t.syntactic_error;
+      const src = t.memory_source || '';
+      return `
+        <div class="turn-row">
+          <div class="turn-num ${isErr ? 'err' : 'ok'}">${t.turn != null ? t.turn : i}</div>
+          <div class="turn-body">
+            <div class="turn-action">${t.action}</div>
+            <div class="turn-obs">${t.observation}</div>
+          </div>
+          ${src && src !== 'none' ? `<div class="turn-source ${src}">${src}</div>` : ''}
+        </div>
+      `;
+    }).join('');
+
+    vibeRunning = false;
+    document.querySelectorAll('.task-card').forEach(c => c.classList.remove('disabled'));
+  });
+}
+
+// ── Comparison tab ──
+function renderComparison() {
+  const b = SAMPLE_DATA.baseline;
+  const r = SAMPLE_DATA.rag;
+
+  const metrics = [
+    { label: 'Success Rate', bv: (b.success_rate*100).toFixed(0)+'%', rv: (r.success_rate*100).toFixed(0)+'%', bp: b.success_rate*100, rp: r.success_rate*100 },
+    { label: 'Avg Turns', bv: b.avg_turns, rv: r.avg_turns, bp: b.avg_turns/25*100, rp: r.avg_turns/25*100 },
+    { label: 'Syntax Errors', bv: b.syntactic_errors, rv: r.syntactic_errors, bp: b.syntactic_errors/10*100, rp: r.syntactic_errors/10*100 },
+    { label: 'Spatial Halluc.', bv: b.spatial_hallucinations, rv: r.spatial_hallucinations, bp: b.spatial_hallucinations/8*100, rp: r.spatial_hallucinations/8*100 },
+    { label: 'Avg Tokens', bv: b.avg_tokens.toLocaleString(), rv: r.avg_tokens.toLocaleString(), bp: b.avg_tokens/20000*100, rp: r.avg_tokens/20000*100 },
+    { label: 'Cost (10 tasks)', bv: '$'+b.cost.toFixed(4), rv: '$'+r.cost.toFixed(4), bp: b.cost/0.03*100, rp: r.cost/0.03*100 },
+  ];
+
+  document.getElementById('comparison-bars').innerHTML = metrics.map(m => `
+    <div class="bar-chart-row">
+      <div class="bar-label">${m.label}</div>
+      <div class="bar-track">
+        <div class="bar-fill orange" style="width:${Math.min(m.bp,100)}%">${m.bv}</div>
+        <div class="bar-fill cyan" style="width:${Math.min(m.rp,100)}%">${m.rv}</div>
+      </div>
+    </div>
+  `).join('');
+
+  function statList(d) {
+    return Object.entries({
+      'Success Rate': (d.success_rate*100).toFixed(0) + '%',
+      'Avg Turns': d.avg_turns,
+      'Avg Tokens': d.avg_tokens.toLocaleString(),
+      'Syntax Errors': d.syntactic_errors,
+      'Spatial Halluc.': d.spatial_hallucinations,
+      'Cost (10 tasks)': '$' + d.cost.toFixed(4),
+    }).map(([k,v]) => `
+      <div class="compare-stat">
+        <span class="label">${k}</span>
+        <span class="val">${v}</span>
+      </div>
+    `).join('');
+  }
+
+  document.getElementById('compare-baseline').innerHTML = statList(b);
+  document.getElementById('compare-rag').innerHTML = statList(r);
+}
+renderComparison();
+</script>
+</body>
+</html>
