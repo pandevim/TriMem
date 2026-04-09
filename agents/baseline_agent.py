@@ -49,7 +49,7 @@ class BaselineAgent(BaseAgent):
             messages=self.history,
         )
 
-        action = resp.text
+        action = self.parse_action(resp.text)
         tokens_in = resp.tokens_in
         tokens_out = resp.tokens_out
         latency = resp.latency_ms
