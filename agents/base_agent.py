@@ -36,9 +36,9 @@ class BaseAgent(ABC):
         if "</think>" not in raw and len(lines) == 1:
             return lines[0]
 
-        # Fallback: find the first line matching a valid ALFWorld action pattern
+        # Fallback: find the first line matching a valid IT auditor command
         action_pattern = re.compile(
-            r"^(go to|take|put|open|close|clean|heat|cool|use|slice|examine)\s"
+            r"^(access|query|download|upload|revoke|scan|run)\s"
         )
         for line in lines:
             if action_pattern.match(line):

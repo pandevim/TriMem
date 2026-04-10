@@ -75,13 +75,20 @@ def run_task(agent, task: dict, task_num: int = 0,
         obs, done, success = env.step(action)
         metric.observation = obs
 
-        # Detect errors from environment response
-        metric.syntactic_error = obs.strip().lower() == "nothing happens."
+        # Per-turn success: action advanced the solution (no error response)
+        error_signals = ("syntax error", "returned no results", "access denied")
+        metric.success = not any(s in obs.lower() for s in error_signals)
+        metric.syntactic_error = "syntax error" in obs.lower()
         task_metric.add_turn(metric)
 
         if verbose:
-            status = "✓" if not metric.syntactic_error else "✗"
-            print(f"{status} {action:40s} → {obs[:60]}", flush=True)
+            # Show raw LLM output (strip thinking block if present)
+            raw = metric.llm_output
+            if "</think>" in raw:
+                raw = raw.rsplit("</think>", 1)[-1].strip()
+            print(f"  [LLM] {raw[:200]}", flush=True)
+            status = "✓" if metric.success else "✗"
+            print(f"  {status} {action:40s} → {obs[:60]}", flush=True)
 
         if done:
             task_metric.finalize(success)

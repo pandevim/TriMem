@@ -78,13 +78,14 @@ class BaselineAgent(BaseAgent):
             turn=turn,
             action=action,
             observation=observation,
-            success=True,
+            success=False,  # updated by runner after env.step()
             tokens_in=tokens_in,
             tokens_out=tokens_out,
             memory_source="none",
             latency_ms=latency,
             syntactic_error=syntactic_error,
             spatial_hallucination=spatial_hallucination,
+            llm_output=resp.text,
         )
 
         return action, metric

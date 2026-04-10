@@ -16,8 +16,9 @@ class TurnMetric:
     memory_source: str = "none"        # "msa" | "visual_bus" | "rag" | "none"
     entropy_score: float = -1.0        # -1 = not measured
     latency_ms: float = 0.0
-    syntactic_error: bool = False      # env returned "Nothing happens"
+    syntactic_error: bool = False      # env returned "Syntax error"
     spatial_hallucination: bool = False # tried interacting with wrong object
+    llm_output: str = ""               # raw LLM response before parsing
 
 
 @dataclass
