@@ -17,9 +17,6 @@ env/
 *.swp
 *.swo
 
-# Logs and benchmark results
-logs/
-
 # ChromaDB local storage
 chroma_data/
 
@@ -29,6 +26,4 @@ Thumbs.db
 
 # Environment variables
 .env
-
-logs/
 

@@ -532,13 +532,14 @@ python frontend/app.py
 - Queries top-5 relevant facts before each action, injects as "RELEVANT MEMORY" block
 - Same system prompt + RAG memory system description
 
-### ✅ ALFWorld Simulator
+### ✅ NovaCorp Audit Simulator
 
-- 10 task templates covering 6 task types: heat, clean, cool, pick_and_place, slice, examine
-- Strict sequential step validation (mirrors ALFWorld's rigid parser)
-- Returns "Nothing happens." for wrong syntax or wrong order
-- Returns "I don't understand that command." for invalid command formats
-- Generates realistic observations with object IDs and distractor items
+- 6 task templates covering 5 audit task types: audit, security, compliance, patch, analysis
+- Strict sequential step validation — actions must follow the correct SOP order
+- Returns "Access denied or prerequisite not met." for out-of-order but valid steps
+- Returns "Command executed but returned no results or failed." for wrong targets
+- Returns "Syntax error: Unrecognized terminal command." for invalid command formats
+- Generates realistic observations with record IDs (e.g. `invoice_1`, `token_1`) and distractor systems
 
 ### ✅ Metrics System
 
@@ -562,11 +563,10 @@ python frontend/app.py
 
 ### Immediate: Phase 3 — Visual Bus
 
-1. Implement screenshot/text-to-image rendering for agent observations
-2. Build the Segment Optical Caching tile manager (compress, store, retrieve image patches)
-3. Create `VisualBusAgent` that uses vision model to read compressed history
-4. Requires switching to a multimodal open-source model (e.g., Qwen-VL)
-5. Key measurement: does the token cost curve flatten while maintaining success rate?
+1. Implement text-to-image renderer for agent history (PIL, monospace font, color-coded: blue for observations, red for actions)
+2. Integrate DeepSeek-OCR-2 as the visual memory reader (reads rendered history image → compressed text)
+3. Create `VisualBusAgent` that renders history → DeepSeek-OCR-2 reads it → compressed summary fed to Qwen 3.5 for reasoning
+4. Key measurement: does the token cost curve flatten while maintaining success rate?
 
 ### Then: Phase 4 — Entropy Router
 
