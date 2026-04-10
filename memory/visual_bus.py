@@ -2,7 +2,7 @@
 Phase 3: Visual Bus — Episodic Working Memory.
 
 Renders agent history (observations + actions) into a PIL image,
-then runs DeepSeek-OCR-2 to compress that image back into text.
+then runs GLM-OCR (0.9B) to compress that image back into text.
 
 The key insight: instead of appending thousands of raw text tokens to the
 LLM context each turn, we render history to a compact image and let OCR
@@ -11,22 +11,18 @@ fixed-size compressed summary, not a growing transcript.
 
 Flow per turn:
   history list → render_history() → image on disk
-               → compress()       → DeepSeek-OCR-2 reads image
-                                  → compressed markdown text returned
+               → compress()       → GLM-OCR reads image
+                                  → compressed text returned
 """
 from __future__ import annotations
 
 import os
 import textwrap
 import time
-from pathlib import Path
-from typing import Optional
 
 from configs.settings import (
     OCR_MODEL_NAME,
     VISUAL_BUS_HISTORY_DIR,
-    VISUAL_BUS_BASE_SIZE,
-    VISUAL_BUS_IMAGE_SIZE,
     VISUAL_BUS_IMAGE_WIDTH,
     VISUAL_BUS_FONT_SIZE,
     MAX_VISUAL_TILES,
@@ -37,7 +33,6 @@ _COLOUR_BG = (18, 18, 24)          # dark background
 _COLOUR_OBS = (100, 180, 255)      # blue — environment observations
 _COLOUR_ACT = (255, 110, 110)      # red  — agent actions
 _COLOUR_TURN = (120, 120, 140)     # grey — turn label
-_COLOUR_WHITE = (230, 230, 235)    # fallback text
 
 
 def _find_monospace_font(size: int):
@@ -48,8 +43,8 @@ def _find_monospace_font(size: int):
         "/usr/share/fonts/truetype/dejavu/DejaVuSansMono.ttf",
         "/usr/share/fonts/truetype/liberation/LiberationMono-Regular.ttf",
         "/usr/share/fonts/truetype/freefont/FreeMono.ttf",
-        "/System/Library/Fonts/Menlo.ttc",                    # macOS
-        "C:/Windows/Fonts/consola.ttf",                       # Windows
+        "/System/Library/Fonts/Menlo.ttc",
+        "C:/Windows/Fonts/consola.ttf",
     ]
     for path in candidates:
         if os.path.exists(path):
@@ -85,9 +80,7 @@ def render_history(
 
     font = _find_monospace_font(font_size)
 
-    # Approximate character width/height for the chosen font
     try:
-        # PIL >= 10
         bbox = font.getbbox("M")
         char_w = bbox[2] - bbox[0]
         char_h = bbox[3] - bbox[1]
@@ -99,14 +92,12 @@ def render_history(
     usable_width = image_width - 2 * padding
     chars_per_line = max(20, usable_width // max(1, char_w))
 
-    # Truncate to last max_turns entries (each entry = one obs or action)
     recent = history[-max_turns * 2:] if len(history) > max_turns * 2 else history
 
-    # Pre-compute wrapped lines
     rendered_lines: list[tuple[str, tuple[int, int, int]]] = []
     turn_num = max(0, len(history) // 2 - len(recent) // 2)
 
-    for i, msg in enumerate(recent):
+    for msg in recent:
         role = msg["role"]
         content = msg.get("content", "")
 
@@ -119,15 +110,11 @@ def render_history(
             turn_num += 1
 
         rendered_lines.append((label + "─" * max(0, chars_per_line - len(label)), _COLOUR_TURN))
-
         wrapped = textwrap.wrap(content, width=chars_per_line) or ["(empty)"]
         for line in wrapped:
             rendered_lines.append((line, colour))
 
-    # Calculate image height
-    total_lines = len(rendered_lines)
-    img_height = max(200, padding * 2 + total_lines * line_spacing + padding)
-
+    img_height = max(200, padding * 2 + len(rendered_lines) * line_spacing + padding)
     img = Image.new("RGB", (image_width, img_height), _COLOUR_BG)
     draw = ImageDraw.Draw(img)
 
@@ -145,15 +132,21 @@ class VisualBus:
     """
     Episodic working memory via visual compression.
 
-    Renders agent history to an image each turn, then uses DeepSeek-OCR-2
+    Renders agent history to an image each turn, then uses GLM-OCR (0.9B)
     to extract a compact text summary. The reasoning LLM receives this
     compressed summary instead of the raw growing transcript.
+
+    GLM-OCR uses standard HuggingFace APIs (AutoProcessor +
+    AutoModelForImageTextToText) with no trust_remote_code — no compatibility
+    patches required.
     """
+
+    _ocr_unavailable: bool = False  # class-level: stop retrying after first failure
 
     def __init__(self, history_dir: str = VISUAL_BUS_HISTORY_DIR):
         self.history_dir = history_dir
         self._ocr_model = None
-        self._ocr_tokenizer = None
+        self._ocr_processor = None
         self._task_id: str = "task"
         self._turn: int = 0
         os.makedirs(history_dir, exist_ok=True)
@@ -165,66 +158,26 @@ class VisualBus:
     # ------------------------------------------------------------------
     # OCR model — lazy-loaded once, shared across all compress() calls
     # ------------------------------------------------------------------
-    _ocr_unavailable: bool = False  # class-level flag: stop retrying after first failure
-
-    @staticmethod
-    def _patch_llama_flash_attn():
-        """
-        Stub ``LlamaFlashAttention2`` for transformers versions that removed it.
-
-        DeepSeek-OCR-2's remote code imports ``LlamaFlashAttention2`` at module
-        level, but only uses it when ``_attn_implementation='flash_attention_2'``.
-        We load with ``'eager'`` so the stub is imported but never called.
-
-        Root cause: vLLM ≥0.15 needs transformers ≥4.50 (for Gemma3Config),
-        but transformers ≥4.48 removed LlamaFlashAttention2. Monkey-patching
-        bridges the gap without pinning transformers to an older version.
-        """
-        try:
-            import transformers.models.llama.modeling_llama as llama_mod
-            if not hasattr(llama_mod, "LlamaFlashAttention2"):
-                # Use SdpaAttention as a stand-in; it's never called because
-                # we always load with _attn_implementation='eager'.
-                fallback_cls = getattr(
-                    llama_mod, "LlamaSdpaAttention",
-                    getattr(llama_mod, "LlamaAttention", object),
-                )
-                llama_mod.LlamaFlashAttention2 = fallback_cls
-                print(
-                    "[VisualBus] Patched LlamaFlashAttention2 stub "
-                    f"(using {fallback_cls.__name__})",
-                    flush=True,
-                )
-        except Exception as patch_err:
-            print(f"[VisualBus] WARNING: could not apply LlamaFlashAttention2 patch: {patch_err}", flush=True)
 
     def _load_ocr(self) -> bool:
-        """Load DeepSeek-OCR-2. Returns False if unavailable (OOM, missing deps, etc.)."""
+        """Load GLM-OCR. Returns False if unavailable (OOM, missing deps, etc.)."""
         if self._ocr_model is not None:
             return True
         if VisualBus._ocr_unavailable:
             return False
 
         try:
-            import torch
-            from transformers import AutoModel, AutoTokenizer
-
-            # Must patch before the model's remote code is imported
-            self._patch_llama_flash_attn()
+            from transformers import AutoProcessor, AutoModelForImageTextToText
 
             print(f"[VisualBus] Loading OCR model ({OCR_MODEL_NAME}) …", flush=True)
             t0 = time.time()
-            self._ocr_tokenizer = AutoTokenizer.from_pretrained(
-                OCR_MODEL_NAME, trust_remote_code=True
-            )
-            # Use 'eager' so LlamaFlashAttention2 (stubbed above) is never instantiated
-            self._ocr_model = AutoModel.from_pretrained(
+            self._ocr_processor = AutoProcessor.from_pretrained(OCR_MODEL_NAME)
+            self._ocr_model = AutoModelForImageTextToText.from_pretrained(
                 OCR_MODEL_NAME,
-                _attn_implementation="eager",
-                trust_remote_code=True,
-                use_safetensors=True,
-                torch_dtype=torch.bfloat16,
-            ).eval().cuda()
+                torch_dtype="auto",
+                device_map="auto",
+            )
+            self._ocr_model.eval()
             print(f"[VisualBus] OCR model ready in {time.time() - t0:.1f}s", flush=True)
             return True
 
@@ -237,11 +190,43 @@ class VisualBus:
             VisualBus._ocr_unavailable = True
             return False
 
+    def _run_ocr(self, image_path: str) -> str:
+        """Run GLM-OCR on a rendered history image. Returns extracted text."""
+        import torch
+
+        messages = [
+            {
+                "role": "user",
+                "content": [
+                    {"type": "image", "url": image_path},
+                    {"type": "text", "text": "Text Recognition:"},
+                ],
+            }
+        ]
+
+        inputs = self._ocr_processor.apply_chat_template(
+            messages,
+            tokenize=True,
+            add_generation_prompt=True,
+            return_dict=True,
+            return_tensors="pt",
+        ).to(self._ocr_model.device)
+        inputs.pop("token_type_ids", None)
+
+        with torch.no_grad():
+            generated_ids = self._ocr_model.generate(**inputs, max_new_tokens=8192)
+
+        output_text = self._ocr_processor.decode(
+            generated_ids[0][inputs["input_ids"].shape[1]:],
+            skip_special_tokens=False,
+        )
+        return output_text.strip()
+
     def _text_fallback(self, history: list[dict]) -> str:
         """
         Fallback when OCR is unavailable: return a plain-text summary of the
-        most recent MAX_VISUAL_TILES turns. Much cheaper than full history but
-        still grows slowly — useful for debugging, not the real Visual Bus.
+        most recent MAX_VISUAL_TILES turns. Grows slowly — for debugging only,
+        not the real Visual Bus.
         """
         recent = history[-(MAX_VISUAL_TILES * 2):]
         lines = []
@@ -256,13 +241,13 @@ class VisualBus:
     # ------------------------------------------------------------------
     # Public API
     # ------------------------------------------------------------------
+
     def compress(self, history: list[dict]) -> str:
         """
-        Render history to an image and compress via DeepSeek-OCR-2.
+        Render history to an image and compress via GLM-OCR.
 
-        Falls back to truncated plain text if OCR is unavailable
-        (e.g. transformers version mismatch). In either case the agent
-        continues running — the fallback just won't flatten the token curve.
+        Falls back to truncated plain text if OCR is unavailable.
+        In either case the agent continues running.
 
         Returns:
             Compressed text summary of the visual history.
@@ -273,47 +258,25 @@ class VisualBus:
 
         self._turn += 1
 
-        # If OCR can't load, degrade gracefully rather than crashing
         if not self._load_ocr():
             return self._text_fallback(history)
 
         img_name = f"{self._task_id}_t{self._turn:03d}"
         img_path = os.path.join(self.history_dir, f"{img_name}.png")
-        ocr_out_dir = os.path.join(self.history_dir, "ocr_output")
-        os.makedirs(ocr_out_dir, exist_ok=True)
 
         # Step 1: render history to image
         t0 = time.time()
         render_history(history, img_path)
         render_ms = (time.time() - t0) * 1000
 
-        # Step 2: run DeepSeek-OCR-2 on the image
-        prompt = "<image>\n<|grounding|>Convert the document to markdown. "
+        # Step 2: run GLM-OCR on the image
         t1 = time.time()
         try:
-            self._ocr_model.infer(
-                self._ocr_tokenizer,
-                prompt=prompt,
-                image_file=img_path,
-                output_path=ocr_out_dir,
-                base_size=VISUAL_BUS_BASE_SIZE,
-                image_size=VISUAL_BUS_IMAGE_SIZE,
-                crop_mode=True,
-                save_results=True,
-            )
+            compressed = self._run_ocr(img_path)
         except Exception as e:
             print(f"[VisualBus] WARNING: OCR inference failed ({e}). Using text fallback.", flush=True)
             return self._text_fallback(history)
         ocr_ms = (time.time() - t1) * 1000
-
-        # Step 3: read OCR output file
-        result_file = os.path.join(ocr_out_dir, f"{img_name}.md")
-        if os.path.exists(result_file):
-            with open(result_file, "r") as f:
-                compressed = f.read().strip()
-        else:
-            print(f"[VisualBus] WARNING: OCR output not found at {result_file}. Using text fallback.", flush=True)
-            return self._text_fallback(history)
 
         print(
             f"[VisualBus] render={render_ms:.0f}ms  ocr={ocr_ms:.0f}ms  "

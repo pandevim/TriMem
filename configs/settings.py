@@ -21,10 +21,8 @@ RAG_COLLECTION = "tri_mem_facts"
 RAG_TOP_K = 3
 
 # --- Visual Bus (Phase 3) ---
-OCR_MODEL_NAME = "deepseek-ai/DeepSeek-OCR-2"
+OCR_MODEL_NAME = "zai-org/GLM-OCR"
 VISUAL_BUS_HISTORY_DIR = "/tmp/trimem_visual_bus"
-VISUAL_BUS_BASE_SIZE = 1024       # DeepSeek-OCR-2 base_size param
-VISUAL_BUS_IMAGE_SIZE = 768       # DeepSeek-OCR-2 image_size param
 VISUAL_BUS_IMAGE_WIDTH = 1200     # pixel width of rendered history image
 VISUAL_BUS_FONT_SIZE = 14         # pt — monospace font size in rendered image
 MAX_VISUAL_TILES = 20             # max turns to keep in the visual history image
