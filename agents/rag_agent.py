@@ -12,21 +12,27 @@ from utils.llm import get_llm
 
 
 SYSTEM_PROMPT = """\
-You are an expert household robot operating in a simulated home environment.
-You must complete tasks by issuing one action per turn.
+You are an expert IT auditor operating in the NovaCorp corporate network environment.
+You must complete audit tasks by issuing one terminal command per turn.
 
 CRITICAL RULES:
-- Issue EXACTLY ONE action per response. Nothing else. No explanation.
-- Use the EXACT object IDs you observe (e.g., "apple 1", "mug 1", "fridge 1").
-- Valid actions: go to <object>, take <object> from <object>, put <object> in/on <object>,
-  open <object>, close <object>, clean <object> with <object>, heat <object> with <object>,
-  cool <object> with <object>, use <object>, slice <object> with <object>, examine <object>
-- If you get "Nothing happens", your syntax was wrong. Fix it.
+- Issue EXACTLY ONE command per response. Nothing else. No explanation.
+- Use the EXACT system and record IDs you observe (e.g., "procurement_db", "invoice_1").
+- Valid commands:
+    access <system>                  — connect to a system
+    query <system>                   — list records in a system
+    download <record> from <system>  — retrieve a record to your local workspace
+    upload <record> to <system>      — send a record from your local workspace
+    revoke <token> with <system>     — revoke credentials via a system
+    scan <record> with <system>      — scan a record using a security tool
+    run <script>                     — execute a script on the current system
+- If you get "Syntax error" or "Command executed but returned no results", your syntax was wrong. Fix it.
+- Follow prerequisites: you must access a system before downloading from it.
 
 MEMORY SYSTEM:
 You have access to a memory database. Before each action, you will be shown
-relevant facts retrieved from your past observations. Use the EXACT object IDs
-and location names from these retrieved facts.
+relevant facts retrieved from your past observations. Use the EXACT system and
+record IDs from these retrieved facts.
 """
 
 
@@ -49,13 +55,11 @@ class RAGAgent(BaseAgent):
         self.rag.reset()
 
     def act(self, observation: str, turn: int) -> tuple[str, TurnMetric]:
-        # Track location from observation
-        if "you see:" in observation.lower():
-            # Try to extract location from previous action
-            if self.history and self.history[-1]["role"] == "assistant":
-                last_action = self.history[-1]["content"]
-                if last_action.startswith("go to "):
-                    self.current_location = last_action[6:]
+        # Track current system from last access command
+        if self.history and self.history[-1]["role"] == "assistant":
+            last_action = self.history[-1]["content"]
+            if last_action.startswith("access "):
+                self.current_location = last_action[7:]
 
         # Store observation in RAG
         self.rag.store_observation(turn, self.current_location, observation)
@@ -63,7 +67,7 @@ class RAGAgent(BaseAgent):
         # Query RAG for relevant context
         rag_context = ""
         if turn > 0:
-            query = f"What objects are available? Where should I go for: {self.goal}"
+            query = f"What records and systems are available? What system to access for: {self.goal}"
             facts = self.rag.query(query, top_k=5)
             if facts:
                 rag_context = "\n\nRELEVANT MEMORY:\n" + "\n".join(f"- {f}" for f in facts)
@@ -84,11 +88,11 @@ class RAGAgent(BaseAgent):
 
         self.history.append({"role": "assistant", "content": action})
 
-        syntactic_error = "nothing happens" in observation.lower()
+        syntactic_error = "syntax error" in observation.lower()
         spatial_hallucination = (
-            "nothing happens" in observation.lower()
+            ("syntax error" in observation.lower() or "returned no results" in observation.lower())
             and turn > 3
-            and any(action.startswith(p) for p in ["go to ", "take ", "open "])
+            and any(action.startswith(p) for p in ["access ", "download ", "upload ", "query "])
         )
 
         metric = TurnMetric(

@@ -11,18 +11,24 @@ from utils.llm import get_llm
 
 
 SYSTEM_PROMPT = """\
-You are an expert household robot operating in a simulated home environment.
-You must complete tasks by issuing one action per turn.
+You are an expert IT auditor operating in the NovaCorp corporate network environment.
+You must complete audit tasks by issuing one terminal command per turn.
 
 CRITICAL RULES:
-- Issue EXACTLY ONE action per response. Nothing else. No explanation.
-- Use the EXACT object IDs you observe (e.g., "apple 1", "mug 1", "fridge 1").
-- Valid actions: go to <object>, take <object> from <object>, put <object> in/on <object>,
-  open <object>, close <object>, clean <object> with <object>, heat <object> with <object>,
-  cool <object> with <object>, use <object>, slice <object> with <object>, examine <object>
-- If you get "Nothing happens", your syntax was wrong. Fix it.
-- Think about what you need to do step by step: find the object, pick it up,
-  bring it to the right appliance, perform the action, then place it at the destination.
+- Issue EXACTLY ONE command per response. Nothing else. No explanation.
+- Use the EXACT system and record IDs you observe (e.g., "procurement_db", "invoice_1").
+- Valid commands:
+    access <system>                  — connect to a system
+    query <system>                   — list records in a system
+    download <record> from <system>  — retrieve a record to your local workspace
+    upload <record> to <system>      — send a record from your local workspace
+    revoke <token> with <system>     — revoke credentials via a system
+    scan <record> with <system>      — scan a record using a security tool
+    run <script>                     — execute a script on the current system
+- If you get "Syntax error" or "Command executed but returned no results", your syntax was wrong. Fix it.
+- Follow prerequisites: you must access a system before downloading from it.
+- Think step by step: access the source system, query if needed, download the record,
+  access the destination system, then upload/act on the record.
 """
 
 
@@ -58,13 +64,13 @@ class BaselineAgent(BaseAgent):
         self.history.append({"role": "assistant", "content": action})
 
         # Detect errors
-        syntactic_error = "nothing happens" in observation.lower()
+        syntactic_error = "syntax error" in observation.lower()
         spatial_hallucination = (
-            "nothing happens" in observation.lower()
+            ("syntax error" in observation.lower() or "returned no results" in observation.lower())
             and turn > 3
             and any(
                 action.startswith(p)
-                for p in ["go to ", "take ", "open "]
+                for p in ["access ", "download ", "upload ", "query "]
             )
         )
 
