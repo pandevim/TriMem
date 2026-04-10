@@ -165,26 +165,93 @@ class VisualBus:
     # ------------------------------------------------------------------
     # OCR model — lazy-loaded once, shared across all compress() calls
     # ------------------------------------------------------------------
-    def _load_ocr(self):
+    _ocr_unavailable: bool = False  # class-level flag: stop retrying after first failure
+
+    @staticmethod
+    def _patch_llama_flash_attn():
+        """
+        Stub ``LlamaFlashAttention2`` for transformers versions that removed it.
+
+        DeepSeek-OCR-2's remote code imports ``LlamaFlashAttention2`` at module
+        level, but only uses it when ``_attn_implementation='flash_attention_2'``.
+        We load with ``'eager'`` so the stub is imported but never called.
+
+        Root cause: vLLM ≥0.15 needs transformers ≥4.50 (for Gemma3Config),
+        but transformers ≥4.48 removed LlamaFlashAttention2. Monkey-patching
+        bridges the gap without pinning transformers to an older version.
+        """
+        try:
+            import transformers.models.llama.modeling_llama as llama_mod
+            if not hasattr(llama_mod, "LlamaFlashAttention2"):
+                # Use SdpaAttention as a stand-in; it's never called because
+                # we always load with _attn_implementation='eager'.
+                fallback_cls = getattr(
+                    llama_mod, "LlamaSdpaAttention",
+                    getattr(llama_mod, "LlamaAttention", object),
+                )
+                llama_mod.LlamaFlashAttention2 = fallback_cls
+                print(
+                    "[VisualBus] Patched LlamaFlashAttention2 stub "
+                    f"(using {fallback_cls.__name__})",
+                    flush=True,
+                )
+        except Exception as patch_err:
+            print(f"[VisualBus] WARNING: could not apply LlamaFlashAttention2 patch: {patch_err}", flush=True)
+
+    def _load_ocr(self) -> bool:
+        """Load DeepSeek-OCR-2. Returns False if unavailable (OOM, missing deps, etc.)."""
         if self._ocr_model is not None:
-            return
+            return True
+        if VisualBus._ocr_unavailable:
+            return False
 
-        import torch
-        from transformers import AutoModel, AutoTokenizer
+        try:
+            import torch
+            from transformers import AutoModel, AutoTokenizer
 
-        print(f"[VisualBus] Loading OCR model ({OCR_MODEL_NAME}) …", flush=True)
-        t0 = time.time()
-        self._ocr_tokenizer = AutoTokenizer.from_pretrained(
-            OCR_MODEL_NAME, trust_remote_code=True
-        )
-        self._ocr_model = AutoModel.from_pretrained(
-            OCR_MODEL_NAME,
-            _attn_implementation="flash_attention_2",
-            trust_remote_code=True,
-            use_safetensors=True,
-            torch_dtype=torch.bfloat16,
-        ).eval().cuda()
-        print(f"[VisualBus] OCR model ready in {time.time() - t0:.1f}s", flush=True)
+            # Must patch before the model's remote code is imported
+            self._patch_llama_flash_attn()
+
+            print(f"[VisualBus] Loading OCR model ({OCR_MODEL_NAME}) …", flush=True)
+            t0 = time.time()
+            self._ocr_tokenizer = AutoTokenizer.from_pretrained(
+                OCR_MODEL_NAME, trust_remote_code=True
+            )
+            # Use 'eager' so LlamaFlashAttention2 (stubbed above) is never instantiated
+            self._ocr_model = AutoModel.from_pretrained(
+                OCR_MODEL_NAME,
+                _attn_implementation="eager",
+                trust_remote_code=True,
+                use_safetensors=True,
+                torch_dtype=torch.bfloat16,
+            ).eval().cuda()
+            print(f"[VisualBus] OCR model ready in {time.time() - t0:.1f}s", flush=True)
+            return True
+
+        except Exception as e:
+            print(
+                f"[VisualBus] WARNING: OCR model failed to load ({e}).\n"
+                f"  Falling back to truncated text history for this run.",
+                flush=True,
+            )
+            VisualBus._ocr_unavailable = True
+            return False
+
+    def _text_fallback(self, history: list[dict]) -> str:
+        """
+        Fallback when OCR is unavailable: return a plain-text summary of the
+        most recent MAX_VISUAL_TILES turns. Much cheaper than full history but
+        still grows slowly — useful for debugging, not the real Visual Bus.
+        """
+        recent = history[-(MAX_VISUAL_TILES * 2):]
+        lines = []
+        turn = max(0, len(history) // 2 - len(recent) // 2)
+        for msg in recent:
+            role = "OBS" if msg["role"] == "user" else "ACT"
+            if role == "ACT":
+                turn += 1
+            lines.append(f"[Turn {turn} {role}] {msg['content'][:200]}")
+        return "\n".join(lines)
 
     # ------------------------------------------------------------------
     # Public API
@@ -193,14 +260,23 @@ class VisualBus:
         """
         Render history to an image and compress via DeepSeek-OCR-2.
 
+        Falls back to truncated plain text if OCR is unavailable
+        (e.g. transformers version mismatch). In either case the agent
+        continues running — the fallback just won't flatten the token curve.
+
         Returns:
-            Compressed markdown text summary of the visual history.
+            Compressed text summary of the visual history.
             Empty string if history is empty.
         """
         if not history:
             return ""
 
         self._turn += 1
+
+        # If OCR can't load, degrade gracefully rather than crashing
+        if not self._load_ocr():
+            return self._text_fallback(history)
+
         img_name = f"{self._task_id}_t{self._turn:03d}"
         img_path = os.path.join(self.history_dir, f"{img_name}.png")
         ocr_out_dir = os.path.join(self.history_dir, "ocr_output")
@@ -212,19 +288,22 @@ class VisualBus:
         render_ms = (time.time() - t0) * 1000
 
         # Step 2: run DeepSeek-OCR-2 on the image
-        self._load_ocr()
         prompt = "<image>\n<|grounding|>Convert the document to markdown. "
         t1 = time.time()
-        self._ocr_model.infer(
-            self._ocr_tokenizer,
-            prompt=prompt,
-            image_file=img_path,
-            output_path=ocr_out_dir,
-            base_size=VISUAL_BUS_BASE_SIZE,
-            image_size=VISUAL_BUS_IMAGE_SIZE,
-            crop_mode=True,
-            save_results=True,
-        )
+        try:
+            self._ocr_model.infer(
+                self._ocr_tokenizer,
+                prompt=prompt,
+                image_file=img_path,
+                output_path=ocr_out_dir,
+                base_size=VISUAL_BUS_BASE_SIZE,
+                image_size=VISUAL_BUS_IMAGE_SIZE,
+                crop_mode=True,
+                save_results=True,
+            )
+        except Exception as e:
+            print(f"[VisualBus] WARNING: OCR inference failed ({e}). Using text fallback.", flush=True)
+            return self._text_fallback(history)
         ocr_ms = (time.time() - t1) * 1000
 
         # Step 3: read OCR output file
@@ -233,9 +312,8 @@ class VisualBus:
             with open(result_file, "r") as f:
                 compressed = f.read().strip()
         else:
-            # Fallback: couldn't find output file — skip visual compression
-            compressed = ""
-            print(f"[VisualBus] WARNING: OCR output not found at {result_file}", flush=True)
+            print(f"[VisualBus] WARNING: OCR output not found at {result_file}. Using text fallback.", flush=True)
+            return self._text_fallback(history)
 
         print(
             f"[VisualBus] render={render_ms:.0f}ms  ocr={ocr_ms:.0f}ms  "
