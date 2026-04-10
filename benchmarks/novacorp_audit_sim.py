@@ -124,6 +124,8 @@ class NovaCorpAuditSim:
         return (
             f"You are logged into the NovaCorp central IT gateway. "
             f"Available systems on your network are: {all_systems}.\n\n"
+            f"Available commands: access <system>, query <system>, download <file>, "
+            f"upload <file>, scan <target>, run <script>, revoke <permission>.\n\n"
             f"Your audit task is to: {self.goal}"
         )
 
