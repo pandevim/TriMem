@@ -267,16 +267,25 @@ When memories contradict each other (MSA says "Use API v1", Visual Bus learned "
 
 ## Benchmarks & Evaluation Strategy
 
-### Tier 1: ALFWorld (Primary — Phase III)
+### Tier 1: NovaCorp AuditBench (Primary — Custom)
 
-Drops an agent into a simulated household with a goal (e.g., "Wash an apple and put it in the fridge").
+A custom IT procurement & security audit simulator (`benchmarks/novacorp_audit_sim.py`, spec in `benchmarks/IT_PROCUREMENT_AUDIT_BENCHMARK.md`). Drops the agent into NovaCorp — a simulated mid-size SaaS company undergoing an annual IT audit across procurement records, credential vaults, vendor registries, and network inventory.
 
-**Why it fits:**
+**Why it fits (stress-tests every Tri-Mem layer):**
 
-- "Wandering" Forgetting Curve tests the Visual Bus — agent opens cabinet 3 on Turn 2, needs that info on Turn 45
-- Strict Syntax Penalty tests RAG — environment rejects `put apple in fridge` but accepts `put apple 1 in/on fridge 1`
+- **MSA** — a ~40-page IT Policy & Procurement Guide with 12 sections of rules. Baseline agents re-read this every turn and still lose middle-section rules to context rot. MSA pre-computes it once.
+- **Visual Bus** — audits span 36–48+ turns across dozens of records and distractor systems. At turn 42 the agent needs to recall a vendor flagged at turn 8. Raw text history at that point is tens of thousands of tokens; Visual Bus compresses it into OCR-readable tiles.
+- **RAG** — exact alphanumeric strings (API keys like `sk-NvC-4f8a2b1c9d3e7f6a0b`, license serials like `LIC-2024-NVC-00847`, IPs, PO numbers). One wrong character = missed violation. Visual compression will blur these; RAG guarantees lossless recall.
+- **Entropy Router** — policy confidence (low → MSA), uncertainty about prior checks (medium → Visual Bus), need for exact credentials (high → RAG) all fire naturally within one task.
+- **Multi-Agent** — splits cleanly into Compliance Auditor (policy expert) + Forensics Analyst (credential cross-referencer).
 
-**Limitation (defend this):** ALFWorld doesn't justify the MSA layer (kitchen rules are simple). Frame it as the "Micro-Dynamics Benchmark" — isolating Visual Bus + RAG interplay, not testing MSA's upper bounds.
+**Task format:** 6 task templates across 5 audit task types (audit, security, compliance, patch, analysis). Strict sequential step validation — actions must follow the correct SOP order. The environment returns three distinct error classes:
+
+- `Access denied or prerequisite not met.` — out-of-order but otherwise valid step
+- `Command executed but returned no results or failed.` — wrong target
+- `Syntax error: Unrecognized terminal command.` — invalid command format
+
+This replaces ALFWorld as the primary benchmark because AuditBench exercises all three memory layers simultaneously, whereas ALFWorld did not justify the MSA layer.
 
 ### Tier 2: WebArena / Visual-WebArena
 
@@ -290,41 +299,53 @@ Tests long-context, multi-turn tool use in interactive economies. Authors specif
 
 Visual Needle-In-A-Haystack: 100 turns of visually compressed history, retrieve one specific detail from turn 42. Isolates and proves the Visual Bus's attention-guided token pruning works.
 
-### ALFWorld Experiment Design (Detailed)
+### AuditBench Experiment Design (Detailed)
 
 **Metric 1: Spatial Hallucination Rate**
 
-- What: Agent tries to interact with object not in room, or searches empty cabinet again
-- Proves: Visual Bus retains episodic history better than text summarization
+- What: Agent believes it is connected to a system that actually rejected the access, or treats a non-existent endpoint/record as reachable
+- Proves: Visual Bus retains episodic truth about *what failed* better than text summarization
+- Observed on `audit_vendor_invoice_0` (1-task runs): Baseline = 25, RAG = 34, Visual Bus = 19
 
 **Metric 2: Syntactic Rejection Rate**
 
-- What: Environment returns "Nothing happens." due to wrong command format or forgotten object ID
-- Proves: RAG bridges lossy visual memory and discrete textual execution
+- What: Environment returns `Syntax error: Unrecognized terminal command.` due to malformed command or (in Visual Bus runs) raw `<think>` reasoning leaking into the action slot
+- Proves: RAG bridges lossy visual memory to discrete textual execution; action extractor must not let CoT overflow into the command
+- Observed: Baseline = 0, RAG = 0, Visual Bus = 6
 
-**Metric 3: Token Exhaustion Threshold**
+**Metric 3: Cumulative Token Cost**
 
-- What: Standard agents crash around turn 50 on API context limits
-- Proves: Graph showing baseline token count scaling linearly (failing), Tri-Mem curving and plateauing (surviving to turn 100+)
+- What: Total tokens (in + out) consumed across the full task
+- Proves: Visual Bus should flatten the curve; text-only agents grow super-linearly as RAG context injection compounds
+- Observed: Baseline = 45,169 tokens | RAG = 262,147 tokens | Visual Bus = 58,155 tokens on the same task
+- Signal: RAG alone is the *worst* on token economics — it's lossless for facts but amplifies context. Visual Bus + RAG combined (Phase 3.5) is the hypothesis to validate.
+
+**Metric 4: Action-to-Resolution Length**
+
+- What: Total turns to task completion (lower = less context confusion)
+- Proves: Compressed memory should shorten the resolution path
+- Observed: Baseline = 41 turns | RAG = 48 turns | Visual Bus = 36 turns
 
 ---
 
 ## Metrics to Track
 
-Every benchmark run must report (not just success rate):
+Every benchmark run must report (not just success rate). The rightmost columns show observed values from the `audit_vendor_invoice_0` single-task runs in [logs/](logs/) — Baseline / RAG / Visual Bus.
 
-| Metric                          | What It Measures                                | Which Layer It Tests                  |
-| ------------------------------- | ----------------------------------------------- | ------------------------------------- |
-| **Success Rate**                | Task completion %                               | Overall system                        |
-| **Cumulative Token Cost**       | Total API cost over N-turn task                 | Visual Bus (should flatten the curve) |
-| **Action-to-Resolution Length** | Steps to solve (fewer = less context confusion) | Visual Bus + MSA                      |
-| **Syntactic Failure Rate**      | "Nothing happens" errors from wrong syntax      | RAG (should drive to near-zero)       |
-| **Spatial Hallucination Rate**  | Interacting with wrong/nonexistent objects      | Visual Bus                            |
-| **Token Exhaustion Threshold**  | Turn at which agent degrades/crashes            | Visual Bus + MSA                      |
-| **Memory Source Distribution**  | % of turns using MSA vs Visual Bus vs RAG       | Entropy Router                        |
-| **Router Accuracy**             | Did the router pick the right modality?         | Entropy Router                        |
-| **Latency per Turn**            | Time per decision (router overhead)             | Router efficiency                     |
-| **Cost per Task**               | USD cost comparison across agents               | Token economics                       |
+| Metric                          | What It Measures                                       | Which Layer It Tests                  | TurnMetric Field                           | Baseline          | RAG                | Visual Bus       |
+| ------------------------------- | ------------------------------------------------------ | ------------------------------------- | ------------------------------------------ | ----------------- | ------------------ | ---------------- |
+| **Success Rate**                | Task completion %                                      | Overall system                        | `TaskMetric.success`                       | 1.0               | 1.0                | 1.0              |
+| **Cumulative Token Cost**       | Total tokens (in + out) over N-turn task               | Visual Bus (should flatten the curve) | `tokens_in + tokens_out`                   | 45,169            | 262,147            | 58,155           |
+| **Action-to-Resolution Length** | Steps to solve (fewer = less context confusion)        | Visual Bus + MSA                      | `TaskMetric.total_turns`                   | 41                | 48                 | 36               |
+| **Syntactic Failure Rate**      | Environment "Syntax error" responses                   | RAG (should drive to near-zero)       | `syntactic_error` (bool per turn)          | 0                 | 0                  | 6 ⚠️             |
+| **Spatial Hallucination Rate**  | Interacting with non-reachable systems/records         | Visual Bus                            | `spatial_hallucination` (bool per turn)    | 25                | 34                 | 19               |
+| **Token Exhaustion Threshold**  | Turn at which agent degrades/crashes                   | Visual Bus + MSA                      | derived from per-turn `tokens_in` curve    | n/a (passed)      | n/a (passed)       | n/a (passed)     |
+| **Memory Source Distribution**  | % of turns using MSA vs Visual Bus vs RAG              | Entropy Router                        | `memory_source`                            | 100% text         | 100% rag           | 100% visual_bus  |
+| **Router Accuracy**             | Did the router pick the right modality?                | Entropy Router                        | `memory_source` vs ground truth            | n/a (Phase 4)     | n/a (Phase 4)      | n/a (Phase 4)    |
+| **Latency per Turn**            | Time per decision (router + inference overhead)        | Router efficiency                     | `latency_ms`                               | tracked           | tracked            | ~2.7s normal / ~7.7s on CoT-overflow turns |
+| **Cost per Task**               | USD cost comparison across agents                      | Token economics                       | `TaskMetric.total_cost_usd`                | $0.00 (local)     | $0.00 (local)      | $0.00 (local)    |
+| **Entropy Score per Turn**      | Model output-logit Shannon entropy (Phase 4 signal)    | Entropy Router                        | `entropy_score`                            | −1.0 (not wired)  | −1.0 (not wired)   | −1.0 (not wired) |
+| **Duration per Task**           | Wall-clock seconds to completion                       | End-to-end throughput                 | `TaskMetric.duration_s`                    | tracked           | tracked            | 817.5 s          |
 
 ---
 
@@ -355,7 +376,7 @@ Simulate MSA with frozen long-context prompt. Implement Visual Bus with screensh
 
 ### Phase 1: Baseline Agent (Control Group) ✅ BUILT
 
-- Simple ALFWorld agent using standard LLM with full text history appended every turn
+- Simple text-history agent (full conversation appended every turn) tested on the NovaCorp AuditBench
 - No memory optimization — this is the control group
 - Measures: success rate, token cost per task, failure modes
 - Everything after this gets compared back to this baseline
@@ -367,13 +388,13 @@ Simulate MSA with frozen long-context prompt. Implement Visual Bus with screensh
 - Measures: whether syntactic rejection rate drops compared to baseline
 - Expected: fewer syntax errors, slightly higher token count (RAG context injection)
 
-### Phase 3: + Visual Bus 🔲 NEXT
+### Phase 3: + Visual Bus ✅ BUILT
 
-- Replace growing text history with compressed screenshot/image tiles
+- Replaces growing text history with rendered image tiles read back via GLM-OCR
 - Agent "sees" its past as images instead of reading JSON logs
-- Uses Segment Optical Caching to maintain compressed visual timeline
+- Uses OCR-based episodic compression to maintain a compact visual timeline
 - Measures: token savings and whether spatial hallucination rate drops
-- Requires: multimodal model (Gemini, Qwen-VL, or Claude with vision)
+- Requires: multimodal model (GLM-OCR for reading, Qwen 3.5 for reasoning)
 
 ### Phase 4: + Entropy Router 🔲
 
@@ -409,13 +430,15 @@ tri-mem/
 ├── agents/
 │   ├── base_agent.py                  # Abstract agent interface
 │   ├── baseline_agent.py              # Phase 1: full text history agent
-│   └── rag_agent.py                   # Phase 2: RAG-augmented agent
+│   ├── rag_agent.py                   # Phase 2: RAG-augmented agent
+│   └── visual_bus_agent.py            # Phase 3: Visual Bus episodic memory agent
 │
 ├── benchmarks/
 │   └── novacorp_audit_sim.py          # Simulated NovaCorp Audit environment
 │                                      #   - 10 task templates (heat, clean, cool, pick_and_place, slice, examine)
-│                                      #   - Strict syntax parsing (mirrors real ALFWorld)
-│                                      #   - Drop-in replaceable with real ALFWorld
+│                                      #   - Strict sequential SOP validation
+│                                      #   - Three distinct failure modes (prereq / wrong target / syntax)
+│   └── IT_PROCUREMENT_AUDIT_BENCHMARK.md  # Full AuditBench design spec
 │
 ├── configs/
 │   └── settings.py                    # All configuration (model, thresholds, ports)
@@ -431,9 +454,12 @@ tri-mem/
 │                                      #   - Agent Comparison tab (side-by-side bar charts)
 │
 ├── memory/
-│   └── rag_store.py                   # ChromaDB-backed vector store
-│                                      #   - store_fact(), store_observation(), query()
-│                                      #   - Extracts object mentions from observations
+│   ├── rag_store.py                   # ChromaDB-backed vector store
+│   │                                  #   - store_fact(), store_observation(), query()
+│   │                                  #   - Extracts object mentions from observations
+│   └── visual_bus.py                  # OCR-based episodic memory compression
+│                                      #   - Renders turn history to image tiles
+│                                      #   - GLM-OCR reads tiles back to compressed text
 │
 ├── router/                            # Phase 4 (empty, to be built)
 │
@@ -490,7 +516,13 @@ python run_benchmark.py --agent baseline --tasks 5
 python run_benchmark.py --agent rag --tasks 5
 ```
 
-### Run Both and Compare
+### Run Phase 3 Visual Bus Benchmark
+
+```bash
+python run_benchmark.py --agent visual_bus --tasks 5
+```
+
+### Run All and Compare
 
 ```bash
 python run_benchmark.py --agent all --tasks 5
@@ -510,9 +542,9 @@ python frontend/app.py
 ### CLI Options
 
 ```
---agent {baseline,rag,all}   Which agent to benchmark
---tasks N                    Number of tasks to run (default: 5)
---quiet                      Suppress per-turn output
+--agent {baseline,rag,visual_bus,all}   Which agent to benchmark
+--tasks N                               Number of tasks to run (default: 5)
+--quiet                                 Suppress per-turn output
 ```
 
 ---
@@ -522,7 +554,7 @@ python frontend/app.py
 ### ✅ Phase 1 — Baseline Agent
 
 - `BaselineAgent` appends full conversation history every turn
-- System prompt instructs single-action-per-turn with strict ALFWorld syntax
+- System prompt instructs single-action-per-turn with strict AuditBench command syntax
 - Tracks all metrics per turn (tokens in/out, latency, errors)
 
 ### ✅ Phase 2 — RAG Agent
@@ -531,6 +563,13 @@ python frontend/app.py
 - Extracts object mentions (regex: "word number" patterns) and stores with location/turn metadata
 - Queries top-5 relevant facts before each action, injects as "RELEVANT MEMORY" block
 - Same system prompt + RAG memory system description
+
+### ✅ Phase 3 — Visual Bus Agent
+
+- `VisualBusAgent` compresses turn history into rendered image tiles read back by GLM-OCR
+- `memory/visual_bus.py` handles text-to-image rendering and OCR decoding of the episodic timeline
+- Compressed summary is fed to Qwen 3.5 for reasoning instead of raw JSON logs
+- Tracks spatial hallucinations and syntactic errors alongside standard metrics
 
 ### ✅ NovaCorp Audit Simulator
 
@@ -561,12 +600,19 @@ python frontend/app.py
 
 ## Next Steps
 
-### Immediate: Phase 3 — Visual Bus
+### Immediate: Phase 3.5 — Visual Bus + RAG combined
 
-1. Implement text-to-image renderer for agent history (PIL, monospace font, color-coded: blue for observations, red for actions)
-2. Integrate DeepSeek-OCR-2 as the visual memory reader (reads rendered history image → compressed text)
-3. Create `VisualBusAgent` that renders history → DeepSeek-OCR-2 reads it → compressed summary fed to Qwen 3.5 for reasoning
-4. Key measurement: does the token cost curve flatten while maintaining success rate?
+1. Visual Bus handles episodic memory (what happened, where things are)
+2. RAG handles exact facts (object IDs, exact syntax strings)
+3. When GLM-OCR's summary mentions an object but blurs the ID, the agent queries RAG for the exact string
+4. Measure whether RAG + Visual Bus together beat either alone (the Syntactic Action Gap hypothesis)
+
+### Known Visual Bus Issues (from initial runs)
+
+- **Spatial hallucinations remain high** — agent still "remembers" successful connections to systems that actually failed, causing long loops on the same action. Compressed recall is losing failure signals.
+- **CoT leakage into actions** — on ~1 in 6 turns the model hits the output token cap mid-reasoning and the raw `<think>` chain is emitted as the action, producing syntactic errors with ~7.7s latency vs ~2.7s on clean turns. Tighten the action extractor or cap CoT length.
+- **Entropy score wired but inert** — all turns report `entropy_score = -1.0`. Needs real logit-derived entropy before Phase 4 routing can use it.
+- **No loop-detection / recovery** — once a session breaks, the agent hammers the same failing command for 10+ turns. Need a repetition guard or backoff heuristic.
 
 ### Then: Phase 4 — Entropy Router
 
@@ -589,13 +635,13 @@ python frontend/app.py
 2. Implement shared Visual Bus (compressed session handoff between agents)
 3. Implement shared RAG store (common fact layer)
 4. Extend entropy router for inter-agent delegation
-5. Design collaborative ALFWorld task (two agents, divided responsibilities)
+5. Design collaborative AuditBench task (Compliance Auditor + Forensics Analyst, divided responsibilities per the spec)
 6. Key measurement: transcript-passing vs shared Tri-Mem overhead and success rate
 
 ### Paper Framing
 
 - Title: _Tri-Mem: Modality-Matched Memory Hierarchies for Multi-Agent Systems_
-- Frame ALFWorld as "Micro-Dynamics Benchmark" (tests Visual Bus + RAG interplay)
+- Frame NovaCorp AuditBench as the end-to-end stress test for all three layers simultaneously; keep ALFWorld/WebArena/EcoGym as future external validation benchmarks
 - Reframe the paper to emphasize the multi-agent orchestration angle (bigger claim, architecture supports it)
 - Include the token cost curve graph as the hero figure
 - Discuss Bayesian calibration as future work (don't need to build it, just need to identify the gap)
@@ -604,8 +650,9 @@ python frontend/app.py
 
 ## Key Design Decisions
 
-- **ALFWorld Sim is drop-in replaceable.** The `ALFWorldSim` class implements `reset()` → initial observation and `step(action)` → (observation, done, success). Swap in real ALFWorld by matching this interface.
-- **Agents are modular.** Every agent extends `BaseAgent` with `reset(goal)` and `act(observation, turn) → (action, TurnMetric)`. Adding a new agent variant means one new file.
-- **Metrics are phase-agnostic.** `TurnMetric` already has fields for `memory_source` and `entropy_score` even though Phase 1-2 don't use them. No schema changes needed as phases are added.
+- **AuditSim is drop-in replaceable.** The `NovaCorpAuditSim` class implements `reset()` → initial briefing and `step(action)` → (observation, done, success). Any environment matching this interface can be swapped in — originally specced against ALFWorld, now replaced by the custom NovaCorp IT procurement audit because it exercises all three memory layers (MSA + Visual Bus + RAG) instead of just two.
+- **Agents are modular.** Every agent extends `BaseAgent` with `reset(goal)` and `act(observation, turn) → (action, TurnMetric)`. Adding a new agent variant means one new file in [agents/](agents/). Three variants exist today: [baseline_agent.py](agents/baseline_agent.py), [rag_agent.py](agents/rag_agent.py), [visual_bus_agent.py](agents/visual_bus_agent.py).
+- **Metrics are phase-agnostic.** `TurnMetric` already has fields for `memory_source` and `entropy_score` even though Phase 1–3 don't emit real entropy values (all runs currently record `-1.0`). No schema changes will be needed when the Phase 4 entropy router lands.
+- **Strict SOP ordering in the benchmark.** The audit simulator distinguishes three failure modes (`Access denied…`, `Command executed but returned no results…`, `Syntax error…`) so that metrics can attribute failures to the *right* memory layer — prerequisite violations stress episodic memory, wrong targets stress fact retrieval, syntax errors stress the action extractor.
 - **Frontend is framework-free.** Pure HTML/CSS/JS, no build step, no node_modules. Opens directly in a browser. Connects to Flask API when available, works standalone with sample data.
 - **Config is centralized.** All thresholds, model settings, and feature flags in `configs/settings.py`.
