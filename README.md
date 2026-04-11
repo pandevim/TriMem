@@ -33,7 +33,7 @@ Tri-Mem solves this by assigning each _cognitive function_ to the _data modality
 
 | Cognitive Function                | Memory Layer                | Data Modality                       | What Goes Here                                                      |
 | --------------------------------- | --------------------------- | ----------------------------------- | ------------------------------------------------------------------- |
-| Rule-following / deep reasoning   | MSA (Semantic Memory)       | Pre-computed KV latent tensors      | System prompts, SOPs, API docs, environment rules                   |
+| Rule-following / deep reasoning   | MSA (Semantic Memory)       | Sparse-attention KV chunks + learned router | System prompts, SOPs, API docs, environment rules                   |
 | Episodic recall ("what happened") | Visual Bus (Working Memory) | Compressed image patches            | Step-by-step interaction history, terminal outputs, navigated pages |
 | Exact fact lookup                 | RAG (Declarative Memory)    | Discrete text tokens from vector DB | Object IDs, API keys, alphanumeric strings, mutating variables      |
 
@@ -110,9 +110,12 @@ In multi-agent systems, feeding 100 turns of verbose JSON logs into the context 
 **1. MSA — The Rulebook (Foundation Layer)**
 
 - Contains: core system prompts, SOPs, massive API documentation, environment rules
-- Mechanism: corpus processed offline, latent KV states pre-loaded into GPU memory
-- Benefit: instant deep-reasoning access to million-token rulebooks without context-window compute tax
-- Current implementation: simulated via frozen long-context system prompt (true MSA requires open-source model access)
+- Mechanism: based on EverMind's [MSA architecture](https://github.com/EverMind-AI/MSA) — a sparse-attention layer with a learnable router over compressed document KV chunks, built on Qwen3-4B.
+  - **Offline**: the rulebook corpus is chunked and run through the model once. For each chunk we store chunk-mean-pooled `K`, `V`, and a routing key `Kᵣ` — compressed state kept in CPU RAM, not GPU.
+  - **Online**: the live query is projected to a routing query `Qᵣ`, cosine-similarity-matched against every stored `Kᵣ`, and the Top-k chunks have their compressed KVs streamed onto GPU, concatenated with the active context, and attended over in one pass.
+  - **Document-wise RoPE**: each stored chunk resets its positional encoding from 0, so a model trained at 64k context extrapolates to effectively unbounded rulebooks (EverMind demonstrates up to ~100M tokens) with no position drift.
+- Benefit: the router is effectively learned RAG — end-to-end differentiable document retrieval baked into the attention layer, so the model itself decides which rulebook sections to pull per turn, no manual prompt engineering.
+- Current implementation: MSA code and weights are marked **"Coming Soon"** by EverMind, so Tri-Mem currently **simulates** the layer with a frozen long-context system prompt. When the upstream drop lands, the simulation is a drop-in replacement for a real sparse-attention MSA layer — Tri-Mem's contribution (modality-to-function mapping, entropy routing across MSA / Visual Bus / RAG) sits on top of MSA rather than competing with it.
 
 **2. Visual Bus — The Scratchpad (Episodic Layer)**
 
@@ -214,11 +217,11 @@ The novelty is NOT any single component — it's the **modality-to-function mapp
 
 Nobody in the literature has argued that:
 
-- Episodic memory should be **visual** (image patches)
-- Semantic memory should be **pre-computed latent states** (KV cache)
-- Declarative memory should be **text retrieval** (vector DB)
+- Episodic memory should be **visual** (image patches, à la AgentOCR)
+- Semantic memory should be **sparse-attention KV chunks with a learned router** (à la EverMind MSA)
+- Declarative memory should be **discrete text retrieval** (vector DB)
 
-...all fused in a single agent loop with a principled entropy-driven routing mechanism.
+...all fused in a single agent loop with a principled entropy-driven routing mechanism across the three modalities. Each building block exists upstream; the contribution is the **composition**: routing between them, resolving conflicts across them, and mapping each cognitive function to the modality that is cheapest and most accurate for it.
 
 This is called **Modality-to-Function Mapping**: specific _types_ of agentic thought require specific _data modalities_ to optimize compute limits. This is highly publishable.
 
@@ -237,7 +240,7 @@ This is called **Modality-to-Function Mapping**: specific _types_ of agentic tho
 
 ### MSA
 
-- EverMind's MSA architecture dropped March 2026. Currently treated as a RAG replacement, not a complementary foundational layer.
+- EverMind's [MSA architecture](https://github.com/EverMind-AI/MSA) (March 2026) is a sparse-attention layer with a learnable router over compressed document KV chunks, built on Qwen3-4B and runnable on 2×A800-class GPUs. It is currently positioned as a long-context RAG *replacement* — a single end-to-end retrieval-augmented attention mechanism, not a complementary memory layer. Tri-Mem reframes it as the **semantic** layer of a three-modality hierarchy, with Visual Bus owning episodic recall and a separate text RAG owning exact-fact retrieval. Code and weights are tagged "Coming Soon"; once released, Tri-Mem's simulated MSA layer becomes a drop-in real implementation.
 
 ### Bayesian Reasoning for LLMs
 
@@ -361,9 +364,9 @@ Every benchmark run must report (not just success rate). The rightmost columns s
 
 - Entropy-based router: approximate by monitoring output logit distributions and triggering RAG calls when confidence drops. Heuristic threshold on token-level entropy gets 80% of the theoretical benefit.
 
-### Out of Reach for Single Research Project (Simulate Instead)
+### Blocked on Upstream (Simulate for Now, Swap In Later)
 
-- True MSA with pre-computed KV states: EverMind's architecture isn't open-source. **Simulate MSA** with a very long frozen system prompt and argue functional equivalence.
+- **True MSA sparse-attention layer:** EverMind's [MSA repo](https://github.com/EverMind-AI/MSA) fully describes the architecture (Qwen3-4B base, chunk-mean-pooled KV + routing key `Kᵣ`, cosine-similarity Top-k retrieval, document-wise RoPE, 2×A800-class footprint) but tags code and weights as "Coming Soon". For now we **simulate MSA** with a frozen long-context system prompt and argue functional equivalence; when upstream ships, the simulation swaps out for the real sparse-attention layer without touching the rest of the Tri-Mem stack. This is meaningfully more feasible than originally scoped — MSA is a small, learned, local-runnable layer, not a bespoke research system.
 - Training a Bayesian-calibrated LLM from scratch: use existing models and measure calibration instead.
 
 ### Recommended Scope
