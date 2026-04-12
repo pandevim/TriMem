@@ -338,20 +338,20 @@ Visual Needle-In-A-Haystack: 100 turns of visually compressed history, retrieve 
 
 Every benchmark run must report (not just success rate). The rightmost columns show observed values from the `audit_vendor_invoice_0` single-task runs in [logs/](logs/) — Baseline / RAG / Visual Bus / MSA.
 
-| Metric                          | What It Measures                                       | Which Layer It Tests                  | TurnMetric Field                           | Baseline          | RAG                | Visual Bus       | MSA              |
-| ------------------------------- | ------------------------------------------------------ | ------------------------------------- | ------------------------------------------ | ----------------- | ------------------ | ---------------- | ---------------- |
-| **Success Rate**                | Task completion %                                      | Overall system                        | `TaskMetric.success`                       | 1.0               | 1.0                | 1.0              | 1.0              |
-| **Cumulative Token Cost**       | Total tokens (in + out) over N-turn task               | Visual Bus (should flatten the curve) | `tokens_in + tokens_out`                   | 45,169            | 262,147            | 58,155           | 29,026           |
-| **Action-to-Resolution Length** | Steps to solve (fewer = less context confusion)        | Visual Bus + MSA                      | `TaskMetric.total_turns`                   | 41                | 48                 | 36               | 6                |
-| **Syntactic Failure Rate**      | Environment "Syntax error" responses                   | RAG (should drive to near-zero)       | `syntactic_error` (bool per turn)          | 0                 | 0                  | 6 ⚠️             | 0                |
-| **Spatial Hallucination Rate**  | Interacting with non-reachable systems/records         | Visual Bus                            | `spatial_hallucination` (bool per turn)    | 25                | 34                 | 19               | 0                |
-| **Token Exhaustion Threshold**  | Turn at which agent degrades/crashes                   | Visual Bus + MSA                      | derived from per-turn `tokens_in` curve    | n/a (passed)      | n/a (passed)       | n/a (passed)     | n/a (passed)     |
-| **Memory Source Distribution**  | % of turns using MSA vs Visual Bus vs RAG              | Entropy Router                        | `memory_source`                            | 100% text         | 100% rag           | 100% visual_bus  | 100% msa         |
-| **Router Accuracy**             | Did the router pick the right modality?                | Entropy Router                        | `memory_source` vs ground truth            | n/a (Phase 4)     | n/a (Phase 4)      | n/a (Phase 4)    | n/a (Phase 4)    |
-| **Latency per Turn**            | Time per decision (router + inference overhead)        | Router efficiency                     | `latency_ms`                               | tracked           | tracked            | ~2.7s normal / ~7.7s on CoT-overflow turns | ~1.2s steady / 11.7s cold start |
-| **Cost per Task**               | USD cost comparison across agents                      | Token economics                       | `TaskMetric.total_cost_usd`                | $0.00 (local)     | $0.00 (local)      | $0.00 (local)    | $0.00 (local)    |
-| **Entropy Score per Turn**      | Model output-logit Shannon entropy (Phase 4 signal)    | Entropy Router                        | `entropy_score`                            | −1.0 (not wired)  | −1.0 (not wired)   | −1.0 (not wired) | −1.0 (not wired) |
-| **Duration per Task**           | Wall-clock seconds to completion                       | End-to-end throughput                 | `TaskMetric.duration_s`                    | tracked           | tracked            | 817.5 s          | 19.5 s           |
+| Metric                          | What It Measures                                       | Which Layer It Tests                  | TurnMetric Field                           | Baseline          | RAG                | Visual Bus       | VBus+RAG          | MSA              |
+| ------------------------------- | ------------------------------------------------------ | ------------------------------------- | ------------------------------------------ | ----------------- | ------------------ | ---------------- | ----------------- | ---------------- |
+| **Success Rate**                | Task completion %                                      | Overall system                        | `TaskMetric.success`                       | 1.0               | 1.0                | 1.0              | pending           | 1.0              |
+| **Cumulative Token Cost**       | Total tokens (in + out) over N-turn task               | Visual Bus (should flatten the curve) | `tokens_in + tokens_out`                   | 45,169            | 262,147            | 58,155           | pending           | 29,026           |
+| **Action-to-Resolution Length** | Steps to solve (fewer = less context confusion)        | Visual Bus + MSA                      | `TaskMetric.total_turns`                   | 41                | 48                 | 36               | pending           | 6                |
+| **Syntactic Failure Rate**      | Environment "Syntax error" responses                   | RAG (should drive to near-zero)       | `syntactic_error` (bool per turn)          | 0                 | 0                  | 6 ⚠️             | pending           | 0                |
+| **Spatial Hallucination Rate**  | Interacting with non-reachable systems/records         | Visual Bus                            | `spatial_hallucination` (bool per turn)    | 25                | 34                 | 19               | pending           | 0                |
+| **Token Exhaustion Threshold**  | Turn at which agent degrades/crashes                   | Visual Bus + MSA                      | derived from per-turn `tokens_in` curve    | n/a (passed)      | n/a (passed)       | n/a (passed)     | pending           | n/a (passed)     |
+| **Memory Source Distribution**  | % of turns using MSA vs Visual Bus vs RAG              | Entropy Router                        | `memory_source`                            | 100% text         | 100% rag           | 100% visual_bus  | 100% vbus_rag    | 100% msa         |
+| **Router Accuracy**             | Did the router pick the right modality?                | Entropy Router                        | `memory_source` vs ground truth            | n/a (Phase 4)     | n/a (Phase 4)      | n/a (Phase 4)    | n/a (Phase 4)     | n/a (Phase 4)    |
+| **Latency per Turn**            | Time per decision (router + inference overhead)        | Router efficiency                     | `latency_ms`                               | tracked           | tracked            | ~2.7s normal / ~7.7s on CoT-overflow turns | pending | ~1.2s steady / 11.7s cold start |
+| **Cost per Task**               | USD cost comparison across agents                      | Token economics                       | `TaskMetric.total_cost_usd`                | $0.00 (local)     | $0.00 (local)      | $0.00 (local)    | $0.00 (local)     | $0.00 (local)    |
+| **Entropy Score per Turn**      | Model output-logit Shannon entropy (Phase 4 signal)    | Entropy Router                        | `entropy_score`                            | −1.0 (not wired)  | −1.0 (not wired)   | −1.0 (not wired) | −1.0 (not wired)  | −1.0 (not wired) |
+| **Duration per Task**           | Wall-clock seconds to completion                       | End-to-end throughput                 | `TaskMetric.duration_s`                    | tracked           | tracked            | 817.5 s          | pending           | 19.5 s           |
 
 ---
 
@@ -411,6 +411,15 @@ Simulate MSA with frozen long-context prompt. Implement Visual Bus with screensh
 - `agents/msa_agent.py` emits `memory_source="msa"` per turn, ready to feed the Phase 4 entropy router
 - Drop-in seam for EverMind's real sparse-attention MSA when weights ship: swap `MSAStore.query()` for a sparse-attention call, leave every caller untouched
 
+### Phase 3.5: Visual Bus + RAG Combined (Syntactic Action Gap) ✅ BUILT
+
+- `agents/visual_bus_rag_agent.py`: `VisualBusRAGAgent` fuses visual episodic memory with **summary-guided** RAG retrieval
+- **Key innovation over Phase 3**: instead of querying RAG with a generic question every turn, the agent extracts entity mentions (system names, record IDs, alphanumeric keys) from the OCR-compressed visual summary and runs targeted RAG lookups for each one. The visual summary tells the agent *what* to look up; RAG provides the *exact* string.
+- **Action outcome tracking**: every action→observation pair is stored in RAG with success/failure metadata, so the agent can recall "access to X failed at turn N" — the failure signal that raw visual compression loses
+- `memory/rag_store.py` gains `query_multi()` (batched de-duplicated retrieval) and `extract_entities()` (regex extraction of IDs from OCR text)
+- Measures: whether targeted RAG + Visual Bus together beat either alone on spatial hallucination rate and syntactic errors (the Syntactic Action Gap hypothesis)
+- `memory_source="visual_bus_rag"` per turn
+
 ### Phase 4: + Entropy Router 🔲
 
 - Build routing logic monitoring model confidence (output logits / token probabilities)
@@ -447,6 +456,10 @@ tri-mem/
 │   ├── baseline_agent.py              # Phase 1: full text history agent
 │   ├── rag_agent.py                   # Phase 2: RAG-augmented agent
 │   ├── visual_bus_agent.py            # Phase 3: Visual Bus episodic memory agent
+│   ├── visual_bus_rag_agent.py         # Phase 3.5: Visual Bus + RAG combined agent
+│                                      #   - Summary-guided RAG: entities extracted from OCR
+│                                      #     summary drive targeted fact lookups
+│                                      #   - Action outcome tracking (success/fail in RAG)
 │   └── msa_agent.py                   # Phase 3.75: MSA semantic memory agent
 │                                      #   - Frozen rulebook system prompt (prefix cache hot)
 │                                      #   - Top-k routed chunks injected per turn
@@ -474,6 +487,8 @@ tri-mem/
 ├── memory/
 │   ├── rag_store.py                   # ChromaDB-backed vector store
 │   │                                  #   - store_fact(), store_observation(), query()
+│   │                                  #   - query_multi(): batched de-duplicated retrieval
+│   │                                  #   - extract_entities(): regex ID extraction from OCR text
 │   │                                  #   - Extracts object mentions from observations
 │   ├── visual_bus.py                  # OCR-based episodic memory compression
 │   │                                  #   - Renders turn history to image tiles
@@ -557,6 +572,12 @@ python run_benchmark.py --agent msa --tasks 5
 
 Ablate the two MSA paths independently by flipping `MSA_INJECT_FULL_RULEBOOK` / `MSA_INJECT_ROUTED_CHUNKS` in `configs/settings.py`.
 
+### Run Phase 3.5 Visual Bus + RAG Benchmark
+
+```bash
+python run_benchmark.py --agent visual_bus_rag --tasks 5
+```
+
 ### Run All and Compare
 
 ```bash
@@ -577,7 +598,7 @@ python frontend/app.py
 ### CLI Options
 
 ```
---agent {baseline,rag,visual_bus,msa,all}   Which agent to benchmark
+--agent {baseline,rag,visual_bus,visual_bus_rag,msa,all}   Which agent to benchmark
 --tasks N                                   Number of tasks to run (default: 5)
 --quiet                                     Suppress per-turn output
 ```
@@ -605,6 +626,14 @@ python frontend/app.py
 - `memory/visual_bus.py` handles text-to-image rendering and OCR decoding of the episodic timeline
 - Compressed summary is fed to Qwen 3.5 for reasoning instead of raw JSON logs
 - Tracks spatial hallucinations and syntactic errors alongside standard metrics
+
+### ✅ Phase 3.5 — Visual Bus + RAG Combined (Syntactic Action Gap)
+
+- `VisualBusRAGAgent` fuses Phase 3's visual episodic memory with **summary-guided** RAG retrieval
+- After OCR compresses the history, `RAGStore.extract_entities()` pulls entity-like mentions (system names like `procurement_db`, record IDs like `invoice_1`, alphanumeric keys) from the compressed text
+- `RAGStore.query_multi()` runs targeted lookups for each extracted entity, returning de-duplicated results — this bridges the Syntactic Action Gap: visual memory knows *what* to look for, RAG provides the *exact* string
+- Action→observation outcomes are stored in RAG with success/failure metadata, so the agent can recall "access to X failed at turn N" — the failure signal that raw visual compression loses (addressing the spatial hallucination problem)
+- Token cost profile matches Phase 3 Visual Bus (~constant), but higher-quality RAG context should reduce hallucination loops and syntactic errors
 
 ### ✅ Phase 3.75 — MSA Semantic Memory Agent (Simulated)
 
@@ -652,12 +681,13 @@ python frontend/app.py
 3. Ablate path 1 vs path 2 by toggling `MSA_INJECT_FULL_RULEBOOK` / `MSA_INJECT_ROUTED_CHUNKS`
 4. Compare cumulative token cost and SOP-ordering errors against Baseline / RAG / Visual Bus on the same task set
 
-### Then: Phase 3.5 — Visual Bus + RAG combined
+### Then: Phase 3.5 — Visual Bus + RAG combined ✅ BUILT
 
-1. Visual Bus handles episodic memory (what happened, where things are)
-2. RAG handles exact facts (object IDs, exact syntax strings)
-3. When GLM-OCR's summary mentions an object but blurs the ID, the agent queries RAG for the exact string
-4. Measure whether RAG + Visual Bus together beat either alone (the Syntactic Action Gap hypothesis)
+1. `VisualBusRAGAgent` built in `agents/visual_bus_rag_agent.py`
+2. Summary-guided RAG: entities extracted from OCR summary → targeted lookups via `RAGStore.query_multi()`
+3. Action outcome tracking: success/failure stored in RAG so agent recalls "X failed at turn N"
+4. Run `python run_benchmark.py --agent visual_bus_rag --tasks 5` and compare against Visual Bus and RAG alone
+5. Key measurement: does targeted RAG reduce spatial hallucinations and syntactic errors vs. Phase 3?
 
 ### Known Visual Bus Issues (from initial runs)
 
@@ -703,7 +733,7 @@ python frontend/app.py
 ## Key Design Decisions
 
 - **AuditSim is drop-in replaceable.** The `NovaCorpAuditSim` class implements `reset()` → initial briefing and `step(action)` → (observation, done, success). Any environment matching this interface can be swapped in — originally specced against ALFWorld, now replaced by the custom NovaCorp IT procurement audit because it exercises all three memory layers (MSA + Visual Bus + RAG) instead of just two.
-- **Agents are modular.** Every agent extends `BaseAgent` with `reset(goal)` and `act(observation, turn) → (action, TurnMetric)`. Adding a new agent variant means one new file in [agents/](agents/). Three variants exist today: [baseline_agent.py](agents/baseline_agent.py), [rag_agent.py](agents/rag_agent.py), [visual_bus_agent.py](agents/visual_bus_agent.py).
+- **Agents are modular.** Every agent extends `BaseAgent` with `reset(goal)` and `act(observation, turn) → (action, TurnMetric)`. Adding a new agent variant means one new file in [agents/](agents/). Five variants exist today: [baseline_agent.py](agents/baseline_agent.py), [rag_agent.py](agents/rag_agent.py), [visual_bus_agent.py](agents/visual_bus_agent.py), [visual_bus_rag_agent.py](agents/visual_bus_rag_agent.py), [msa_agent.py](agents/msa_agent.py).
 - **Metrics are phase-agnostic.** `TurnMetric` already has fields for `memory_source` and `entropy_score` even though Phase 1–3 don't emit real entropy values (all runs currently record `-1.0`). No schema changes will be needed when the Phase 4 entropy router lands.
 - **Strict SOP ordering in the benchmark.** The audit simulator distinguishes three failure modes (`Access denied…`, `Command executed but returned no results…`, `Syntax error…`) so that metrics can attribute failures to the *right* memory layer — prerequisite violations stress episodic memory, wrong targets stress fact retrieval, syntax errors stress the action extractor.
 - **Frontend is framework-free.** Pure HTML/CSS/JS, no build step, no node_modules. Opens directly in a browser. Connects to Flask API when available, works standalone with sample data.

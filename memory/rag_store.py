@@ -67,3 +67,62 @@ class RAGStore:
             n_results=min(k, self.collection.count()),
         )
         return results["documents"][0] if results["documents"] else []
+
+    def query_multi(self, queries: list[str], top_k: int = None) -> list[str]:
+        """Run multiple targeted queries and return de-duplicated results.
+
+        Useful when the Visual Bus summary mentions several entities whose
+        exact IDs may have been blurred by OCR compression.  Each query
+        retrieves its own top-k; results are merged in retrieval order with
+        duplicates removed.
+        """
+        if not queries or self.collection.count() == 0:
+            return []
+        seen: set[str] = set()
+        merged: list[str] = []
+        k = top_k or RAG_TOP_K
+        for q in queries:
+            for doc in self.query(q, top_k=k):
+                if doc not in seen:
+                    seen.add(doc)
+                    merged.append(doc)
+        return merged
+
+    @staticmethod
+    def extract_entities(text: str) -> list[str]:
+        """Pull entity-like mentions from text (e.g. OCR-compressed summary).
+
+        Targets the kinds of identifiers that visual compression blurs:
+          - record/system IDs:  invoice_1, token_3, procurement_db
+          - alphanumeric keys:  sk-NvC-4f8a2b1c, LIC-2024-NVC-00847
+          - word-number pairs:  "vendor 3", "invoice 1"
+        Returns a list of unique mention strings.
+        """
+        import re
+        entities: list[str] = []
+        seen: set[str] = set()
+
+        # underscore-joined identifiers: invoice_1, procurement_db, credential_vault
+        for m in re.findall(r'[a-zA-Z][a-zA-Z0-9]*(?:_[a-zA-Z0-9]+)+', text):
+            low = m.lower()
+            if low not in seen:
+                seen.add(low)
+                entities.append(m)
+
+        # hyphen-joined keys: sk-NvC-4f8a2b1c, LIC-2024-NVC-00847
+        for m in re.findall(r'[a-zA-Z][a-zA-Z0-9]*(?:-[a-zA-Z0-9]+){2,}', text):
+            low = m.lower()
+            if low not in seen:
+                seen.add(low)
+                entities.append(m)
+
+        # word-number pairs: "invoice 1", "token 3" (space, not newline)
+        # Exclude noise like "turn 1", "step 2", "on turn 12"
+        _noise = {"turn", "step", "line", "page", "item", "on", "at", "in", "to", "of"}
+        for m in re.findall(r'[a-z]+(?:[ ][a-z]+)?[ ]\d+', text.lower()):
+            words = m.split()
+            if not any(w in _noise for w in words[:-1]) and m not in seen:
+                seen.add(m)
+                entities.append(m)
+
+        return entities
