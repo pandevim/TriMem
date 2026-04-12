@@ -20,6 +20,7 @@ from configs.settings import (
     AGENT_TEMPERATURE,
     GPU_MEMORY_UTILIZATION,
     MAX_MODEL_LEN,
+    ENABLE_PREFIX_CACHING,
 )
 
 
@@ -47,6 +48,7 @@ class VLLMBackend:
             gpu_memory_utilization=GPU_MEMORY_UTILIZATION,
             max_model_len=MAX_MODEL_LEN,
             trust_remote_code=True,
+            enable_prefix_caching=ENABLE_PREFIX_CACHING,
         )
         print(f"[LLM] vLLM engine ready in {time.time() - t0:.1f}s", flush=True)
 

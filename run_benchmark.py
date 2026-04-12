@@ -33,6 +33,9 @@ def make_agent(name: str):
     elif name == "visual_bus":
         from agents.visual_bus_agent import VisualBusAgent
         return VisualBusAgent()
+    elif name == "msa":
+        from agents.msa_agent import MSAAgent
+        return MSAAgent()
     else:
         raise ValueError(f"Unknown agent: {name}")
 
@@ -157,13 +160,13 @@ def run_benchmark(agent_name: str, num_tasks: int, verbose: bool = True) -> Benc
 def main():
     parser = argparse.ArgumentParser(description="Tri-Mem Benchmark Runner")
     parser.add_argument("--agent", type=str, default="baseline",
-                        choices=["baseline", "rag", "visual_bus", "all"],
+                        choices=["baseline", "rag", "visual_bus", "msa", "all"],
                         help="Which agent to benchmark")
     parser.add_argument("--tasks", type=int, default=5, help="Number of tasks")
     parser.add_argument("--quiet", action="store_true", help="Suppress per-turn output")
     args = parser.parse_args()
 
-    agents = ["baseline", "rag", "visual_bus"] if args.agent == "all" else [args.agent]
+    agents = ["baseline", "rag", "visual_bus", "msa"] if args.agent == "all" else [args.agent]
     results = {}
 
     for agent_name in agents:

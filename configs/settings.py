@@ -20,6 +20,20 @@ DEFAULT_NUM_TASKS = 10
 RAG_COLLECTION = "tri_mem_facts"
 RAG_TOP_K = 3
 
+# --- MSA (Phase 3.75, simulated rulebook layer) ---
+# Static policy corpus. The system prompt must be byte-identical across
+# turns so vLLM's prefix cache holds the rulebook KV once per process.
+import os as _os
+MSA_RULEBOOK_PATH = _os.path.join(
+    _os.path.dirname(_os.path.dirname(_os.path.abspath(__file__))),
+    "memory", "rulebook", "novacorp_it_policy.md",
+)
+MSA_COLLECTION = "tri_mem_msa_rulebook"
+MSA_TOP_K = 2              # routed sections injected per turn
+MSA_INJECT_FULL_RULEBOOK = True  # path 1: freeze full rulebook in system prompt
+MSA_INJECT_ROUTED_CHUNKS = True  # path 2: inject Top-k sections into user turn
+ENABLE_PREFIX_CACHING = True     # vLLM automatic prefix cache
+
 # --- Visual Bus (Phase 3) ---
 OCR_MODEL_NAME = "zai-org/GLM-OCR"
 VISUAL_BUS_HISTORY_DIR = "/tmp/trimem_visual_bus"

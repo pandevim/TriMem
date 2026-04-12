@@ -115,7 +115,10 @@ In multi-agent systems, feeding 100 turns of verbose JSON logs into the context 
   - **Online**: the live query is projected to a routing query `Qᵣ`, cosine-similarity-matched against every stored `Kᵣ`, and the Top-k chunks have their compressed KVs streamed onto GPU, concatenated with the active context, and attended over in one pass.
   - **Document-wise RoPE**: each stored chunk resets its positional encoding from 0, so a model trained at 64k context extrapolates to effectively unbounded rulebooks (EverMind demonstrates up to ~100M tokens) with no position drift.
 - Benefit: the router is effectively learned RAG — end-to-end differentiable document retrieval baked into the attention layer, so the model itself decides which rulebook sections to pull per turn, no manual prompt engineering.
-- Current implementation: MSA code and weights are marked **"Coming Soon"** by EverMind, so Tri-Mem currently **simulates** the layer with a frozen long-context system prompt. When the upstream drop lands, the simulation is a drop-in replacement for a real sparse-attention MSA layer — Tri-Mem's contribution (modality-to-function mapping, entropy routing across MSA / Visual Bus / RAG) sits on top of MSA rather than competing with it.
+- Current implementation (Phase 3.75, ✅ BUILT): MSA code and weights are marked **"Coming Soon"** by EverMind, so Tri-Mem currently **simulates** the layer with a two-path approach that is architecturally faithful to the EverMind design:
+  - **Path 1 — Functional simulation via prefix caching.** The full NovaCorp IT Policy (`memory/rulebook/novacorp_it_policy.md`, 12 sections / ~11k chars / ~2.8k tokens) is embedded in a byte-identical system prompt every turn. vLLM's automatic prefix caching (`enable_prefix_caching=True`) hashes the prefix and reuses the pre-computed rulebook KV across turns, so the rulebook compute is paid exactly once per process even though the agent logically "re-reads" it every turn. This delivers the token-economic win MSA is supposed to produce.
+  - **Path 2 — Poor-man's learned router.** `memory/msa_store.py` chunks the rulebook on `## ` section headings, embeds each chunk with ChromaDB's default encoder (mean-pooled sentence embedding standing in for EverMind's `Kᵣ`), and routes the live query (goal + observation + last action) via cosine Top-k. The routed sections are injected into the *user* message as a `ROUTED POLICY CONTEXT` block — not the system prompt, because that would break the cache. This is the learned-router half of EverMind's design, swapped in as cosine similarity until the real sparse-attention layer ships.
+  - When EverMind's drop lands, `MSAStore.query()` becomes a sparse-attention call and the frozen system prompt becomes a handle to a cached KV tensor. Neither the agent nor the benchmark runner need to change — Tri-Mem's contribution (modality-to-function mapping, entropy routing across MSA / Visual Bus / RAG) sits on top of MSA rather than competing with it.
 
 **2. Visual Bus — The Scratchpad (Episodic Layer)**
 
@@ -333,22 +336,22 @@ Visual Needle-In-A-Haystack: 100 turns of visually compressed history, retrieve 
 
 ## Metrics to Track
 
-Every benchmark run must report (not just success rate). The rightmost columns show observed values from the `audit_vendor_invoice_0` single-task runs in [logs/](logs/) — Baseline / RAG / Visual Bus.
+Every benchmark run must report (not just success rate). The rightmost columns show observed values from the `audit_vendor_invoice_0` single-task runs in [logs/](logs/) — Baseline / RAG / Visual Bus / MSA.
 
-| Metric                          | What It Measures                                       | Which Layer It Tests                  | TurnMetric Field                           | Baseline          | RAG                | Visual Bus       |
-| ------------------------------- | ------------------------------------------------------ | ------------------------------------- | ------------------------------------------ | ----------------- | ------------------ | ---------------- |
-| **Success Rate**                | Task completion %                                      | Overall system                        | `TaskMetric.success`                       | 1.0               | 1.0                | 1.0              |
-| **Cumulative Token Cost**       | Total tokens (in + out) over N-turn task               | Visual Bus (should flatten the curve) | `tokens_in + tokens_out`                   | 45,169            | 262,147            | 58,155           |
-| **Action-to-Resolution Length** | Steps to solve (fewer = less context confusion)        | Visual Bus + MSA                      | `TaskMetric.total_turns`                   | 41                | 48                 | 36               |
-| **Syntactic Failure Rate**      | Environment "Syntax error" responses                   | RAG (should drive to near-zero)       | `syntactic_error` (bool per turn)          | 0                 | 0                  | 6 ⚠️             |
-| **Spatial Hallucination Rate**  | Interacting with non-reachable systems/records         | Visual Bus                            | `spatial_hallucination` (bool per turn)    | 25                | 34                 | 19               |
-| **Token Exhaustion Threshold**  | Turn at which agent degrades/crashes                   | Visual Bus + MSA                      | derived from per-turn `tokens_in` curve    | n/a (passed)      | n/a (passed)       | n/a (passed)     |
-| **Memory Source Distribution**  | % of turns using MSA vs Visual Bus vs RAG              | Entropy Router                        | `memory_source`                            | 100% text         | 100% rag           | 100% visual_bus  |
-| **Router Accuracy**             | Did the router pick the right modality?                | Entropy Router                        | `memory_source` vs ground truth            | n/a (Phase 4)     | n/a (Phase 4)      | n/a (Phase 4)    |
-| **Latency per Turn**            | Time per decision (router + inference overhead)        | Router efficiency                     | `latency_ms`                               | tracked           | tracked            | ~2.7s normal / ~7.7s on CoT-overflow turns |
-| **Cost per Task**               | USD cost comparison across agents                      | Token economics                       | `TaskMetric.total_cost_usd`                | $0.00 (local)     | $0.00 (local)      | $0.00 (local)    |
-| **Entropy Score per Turn**      | Model output-logit Shannon entropy (Phase 4 signal)    | Entropy Router                        | `entropy_score`                            | −1.0 (not wired)  | −1.0 (not wired)   | −1.0 (not wired) |
-| **Duration per Task**           | Wall-clock seconds to completion                       | End-to-end throughput                 | `TaskMetric.duration_s`                    | tracked           | tracked            | 817.5 s          |
+| Metric                          | What It Measures                                       | Which Layer It Tests                  | TurnMetric Field                           | Baseline          | RAG                | Visual Bus       | MSA              |
+| ------------------------------- | ------------------------------------------------------ | ------------------------------------- | ------------------------------------------ | ----------------- | ------------------ | ---------------- | ---------------- |
+| **Success Rate**                | Task completion %                                      | Overall system                        | `TaskMetric.success`                       | 1.0               | 1.0                | 1.0              | 1.0              |
+| **Cumulative Token Cost**       | Total tokens (in + out) over N-turn task               | Visual Bus (should flatten the curve) | `tokens_in + tokens_out`                   | 45,169            | 262,147            | 58,155           | 29,026           |
+| **Action-to-Resolution Length** | Steps to solve (fewer = less context confusion)        | Visual Bus + MSA                      | `TaskMetric.total_turns`                   | 41                | 48                 | 36               | 6                |
+| **Syntactic Failure Rate**      | Environment "Syntax error" responses                   | RAG (should drive to near-zero)       | `syntactic_error` (bool per turn)          | 0                 | 0                  | 6 ⚠️             | 0                |
+| **Spatial Hallucination Rate**  | Interacting with non-reachable systems/records         | Visual Bus                            | `spatial_hallucination` (bool per turn)    | 25                | 34                 | 19               | 0                |
+| **Token Exhaustion Threshold**  | Turn at which agent degrades/crashes                   | Visual Bus + MSA                      | derived from per-turn `tokens_in` curve    | n/a (passed)      | n/a (passed)       | n/a (passed)     | n/a (passed)     |
+| **Memory Source Distribution**  | % of turns using MSA vs Visual Bus vs RAG              | Entropy Router                        | `memory_source`                            | 100% text         | 100% rag           | 100% visual_bus  | 100% msa         |
+| **Router Accuracy**             | Did the router pick the right modality?                | Entropy Router                        | `memory_source` vs ground truth            | n/a (Phase 4)     | n/a (Phase 4)      | n/a (Phase 4)    | n/a (Phase 4)    |
+| **Latency per Turn**            | Time per decision (router + inference overhead)        | Router efficiency                     | `latency_ms`                               | tracked           | tracked            | ~2.7s normal / ~7.7s on CoT-overflow turns | ~1.2s steady / 11.7s cold start |
+| **Cost per Task**               | USD cost comparison across agents                      | Token economics                       | `TaskMetric.total_cost_usd`                | $0.00 (local)     | $0.00 (local)      | $0.00 (local)    | $0.00 (local)    |
+| **Entropy Score per Turn**      | Model output-logit Shannon entropy (Phase 4 signal)    | Entropy Router                        | `entropy_score`                            | −1.0 (not wired)  | −1.0 (not wired)   | −1.0 (not wired) | −1.0 (not wired) |
+| **Duration per Task**           | Wall-clock seconds to completion                       | End-to-end throughput                 | `TaskMetric.duration_s`                    | tracked           | tracked            | 817.5 s          | 19.5 s           |
 
 ---
 
@@ -366,7 +369,7 @@ Every benchmark run must report (not just success rate). The rightmost columns s
 
 ### Blocked on Upstream (Simulate for Now, Swap In Later)
 
-- **True MSA sparse-attention layer:** EverMind's [MSA repo](https://github.com/EverMind-AI/MSA) fully describes the architecture (Qwen3-4B base, chunk-mean-pooled KV + routing key `Kᵣ`, cosine-similarity Top-k retrieval, document-wise RoPE, 2×A800-class footprint) but tags code and weights as "Coming Soon". For now we **simulate MSA** with a frozen long-context system prompt and argue functional equivalence; when upstream ships, the simulation swaps out for the real sparse-attention layer without touching the rest of the Tri-Mem stack. This is meaningfully more feasible than originally scoped — MSA is a small, learned, local-runnable layer, not a bespoke research system.
+- **True MSA sparse-attention layer:** EverMind's [MSA repo](https://github.com/EverMind-AI/MSA) fully describes the architecture (Qwen3-4B base, chunk-mean-pooled KV + routing key `Kᵣ`, cosine-similarity Top-k retrieval, document-wise RoPE, 2×A800-class footprint) but tags code and weights as "Coming Soon". Tri-Mem now **simulates MSA** via two paths working in tandem: (1) vLLM prefix caching holds the full rulebook KV once per process, and (2) a ChromaDB-backed Top-k router over section-chunked embeddings injects the most relevant rulebook sections into each turn's user message. When upstream ships, `MSAStore.query()` becomes a sparse-attention call and the frozen prompt becomes a cached-KV handle — the rest of the Tri-Mem stack is unchanged.
 - Training a Bayesian-calibrated LLM from scratch: use existing models and measure calibration instead.
 
 ### Recommended Scope
@@ -398,6 +401,15 @@ Simulate MSA with frozen long-context prompt. Implement Visual Bus with screensh
 - Uses OCR-based episodic compression to maintain a compact visual timeline
 - Measures: token savings and whether spatial hallucination rate drops
 - Requires: multimodal model (GLM-OCR for reading, Qwen 3.5 for reasoning)
+
+### Phase 3.75: + MSA Layer (Simulated Semantic Memory) ✅ BUILT
+
+- Static NovaCorp IT Policy (`memory/rulebook/novacorp_it_policy.md`) chunked into 13 section-level chunks (preamble + 12 SOP/reference sections)
+- **Path 1** — full rulebook embedded in a byte-identical system prompt; vLLM `enable_prefix_caching=True` holds the rulebook KV once per process (set via `configs/settings.ENABLE_PREFIX_CACHING`)
+- **Path 2** — `memory/msa_store.py` exposes cosine Top-k routing over ChromaDB-embedded section chunks; live query (goal + observation + last action) pulls the most relevant sections and injects them into the *user* message only (system prompt stays frozen so the cache holds)
+- Ablation knobs in `configs/settings.py`: `MSA_INJECT_FULL_RULEBOOK`, `MSA_INJECT_ROUTED_CHUNKS`, `MSA_TOP_K` — can run path 1 alone, path 2 alone, or both together
+- `agents/msa_agent.py` emits `memory_source="msa"` per turn, ready to feed the Phase 4 entropy router
+- Drop-in seam for EverMind's real sparse-attention MSA when weights ship: swap `MSAStore.query()` for a sparse-attention call, leave every caller untouched
 
 ### Phase 4: + Entropy Router 🔲
 
@@ -434,7 +446,10 @@ tri-mem/
 │   ├── base_agent.py                  # Abstract agent interface
 │   ├── baseline_agent.py              # Phase 1: full text history agent
 │   ├── rag_agent.py                   # Phase 2: RAG-augmented agent
-│   └── visual_bus_agent.py            # Phase 3: Visual Bus episodic memory agent
+│   ├── visual_bus_agent.py            # Phase 3: Visual Bus episodic memory agent
+│   └── msa_agent.py                   # Phase 3.75: MSA semantic memory agent
+│                                      #   - Frozen rulebook system prompt (prefix cache hot)
+│                                      #   - Top-k routed chunks injected per turn
 │
 ├── benchmarks/
 │   └── novacorp_audit_sim.py          # Simulated NovaCorp Audit environment
@@ -460,9 +475,18 @@ tri-mem/
 │   ├── rag_store.py                   # ChromaDB-backed vector store
 │   │                                  #   - store_fact(), store_observation(), query()
 │   │                                  #   - Extracts object mentions from observations
-│   └── visual_bus.py                  # OCR-based episodic memory compression
-│                                      #   - Renders turn history to image tiles
-│                                      #   - GLM-OCR reads tiles back to compressed text
+│   ├── visual_bus.py                  # OCR-based episodic memory compression
+│   │                                  #   - Renders turn history to image tiles
+│   │                                  #   - GLM-OCR reads tiles back to compressed text
+│   ├── msa_store.py                   # Phase 3.75: simulated MSA rulebook store
+│   │                                  #   - Section-level chunker over markdown rulebook
+│   │                                  #   - ChromaDB cosine Top-k routing
+│   │                                  #   - Process-wide singleton (MSAStore.shared())
+│   │                                  #   - Drop-in seam for EverMind sparse-attention MSA
+│   └── rulebook/
+│       └── novacorp_it_policy.md      # 12-section IT Policy & Procurement Guide
+│                                      #   - Authoritative SOPs for all 6 task templates
+│                                      #   - ~11k chars, frozen in system prompt prefix
 │
 ├── router/                            # Phase 4 (empty, to be built)
 │
@@ -525,6 +549,14 @@ python run_benchmark.py --agent rag --tasks 5
 python run_benchmark.py --agent visual_bus --tasks 5
 ```
 
+### Run Phase 3.75 MSA Benchmark
+
+```bash
+python run_benchmark.py --agent msa --tasks 5
+```
+
+Ablate the two MSA paths independently by flipping `MSA_INJECT_FULL_RULEBOOK` / `MSA_INJECT_ROUTED_CHUNKS` in `configs/settings.py`.
+
 ### Run All and Compare
 
 ```bash
@@ -545,9 +577,9 @@ python frontend/app.py
 ### CLI Options
 
 ```
---agent {baseline,rag,visual_bus,all}   Which agent to benchmark
---tasks N                               Number of tasks to run (default: 5)
---quiet                                 Suppress per-turn output
+--agent {baseline,rag,visual_bus,msa,all}   Which agent to benchmark
+--tasks N                                   Number of tasks to run (default: 5)
+--quiet                                     Suppress per-turn output
 ```
 
 ---
@@ -573,6 +605,16 @@ python frontend/app.py
 - `memory/visual_bus.py` handles text-to-image rendering and OCR decoding of the episodic timeline
 - Compressed summary is fed to Qwen 3.5 for reasoning instead of raw JSON logs
 - Tracks spatial hallucinations and syntactic errors alongside standard metrics
+
+### ✅ Phase 3.75 — MSA Semantic Memory Agent (Simulated)
+
+- `memory/rulebook/novacorp_it_policy.md`: 12-section IT Policy & Procurement Guide with SOPs for every task template (audit, security, compliance, patch, analysis); ~11k chars / ~2.8k tokens
+- `memory/msa_store.py`: `MSAStore` with section-level chunker, ChromaDB Top-k cosine routing, process-wide singleton, and `full_rulebook_text` / `format_routed_chunks` helpers
+- `agents/msa_agent.py`: `MSAAgent` combines path 1 (frozen rulebook system prompt + vLLM prefix caching) and path 2 (live-query Top-k router injecting sections into the user message)
+- Task goal is placed in the first user message (not the system prompt) so the cached prefix is reusable across tasks, not just turns
+- Ablation knobs: `MSA_INJECT_FULL_RULEBOOK`, `MSA_INJECT_ROUTED_CHUNKS`, `MSA_TOP_K` in `configs/settings.py`
+- `ENABLE_PREFIX_CACHING=True` passed through to `vllm.LLM(...)` in `utils/llm.py`
+- Emits `memory_source="msa"` per turn — wired for the Phase 4 entropy router
 
 ### ✅ NovaCorp Audit Simulator
 
@@ -603,7 +645,14 @@ python frontend/app.py
 
 ## Next Steps
 
-### Immediate: Phase 3.5 — Visual Bus + RAG combined
+### Immediate: Run the MSA benchmark on GPU
+
+1. `python run_benchmark.py --agent msa --tasks 5` on the Colab A100 / GPU box
+2. Verify vLLM prefix cache hits (look for flat per-turn `tokens_in` once the rulebook is cached)
+3. Ablate path 1 vs path 2 by toggling `MSA_INJECT_FULL_RULEBOOK` / `MSA_INJECT_ROUTED_CHUNKS`
+4. Compare cumulative token cost and SOP-ordering errors against Baseline / RAG / Visual Bus on the same task set
+
+### Then: Phase 3.5 — Visual Bus + RAG combined
 
 1. Visual Bus handles episodic memory (what happened, where things are)
 2. RAG handles exact facts (object IDs, exact syntax strings)
