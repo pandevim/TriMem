@@ -159,7 +159,13 @@ class NovaCorpAuditSim:
         # Check if it matches a FUTURE step (out of order but valid)
         for future_idx in range(self.step_index + 1, len(self.solution)):
             if action == self._valid_at_step[future_idx].lower():
-                return "Access denied or prerequisite not met. Follow standard operating procedures.", False, False
+                next_required = self._valid_at_step[self.step_index]
+                return (
+                    f"Access denied or prerequisite not met. "
+                    f"You must first complete: '{next_required}'.",
+                    False,
+                    False,
+                )
 
         # Check if it's a valid command format but wrong target
         if any(action.startswith(prefix) for prefix in

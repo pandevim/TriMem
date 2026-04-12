@@ -71,17 +71,28 @@ class BaseAgent(ABC):
     # ── Loop detection ──
 
     _REPEAT_THRESHOLD = 3   # flag after this many consecutive repeats
+    _BLACKLIST_THRESHOLD = 3  # blacklist a command after this many total failures
     _FAIL_WINDOW = 5        # look-back window for the failure-rate guard
 
     def _init_loop_guard(self):
         """Call from subclass __init__ or reset to initialise tracking state."""
         self._recent_actions: list[str] = []
         self._recent_success: list[bool] = []
+        self._failure_counts: dict[str, int] = {}   # per-command failure tally
+        self._blacklisted: set[str] = set()          # commands that hit the threshold
 
     def _record_outcome(self, action: str, succeeded: bool):
         """Record an action and its outcome for loop detection."""
         self._recent_actions.append(action)
         self._recent_success.append(succeeded)
+        if not succeeded:
+            self._failure_counts[action] = self._failure_counts.get(action, 0) + 1
+            if self._failure_counts[action] >= self._BLACKLIST_THRESHOLD:
+                self._blacklisted.add(action)
+        else:
+            # A success clears the failure tally for that action
+            self._failure_counts.pop(action, None)
+            self._blacklisted.discard(action)
 
     def _loop_warning(self) -> str:
         """Return a warning string if the agent is stuck, else empty string.
@@ -89,20 +100,29 @@ class BaseAgent(ABC):
         Detects two patterns:
           1. Same action repeated ≥ _REPEAT_THRESHOLD times in a row.
           2. Last _FAIL_WINDOW actions all failed (even if different).
+        Also emits an explicit, named blacklist of commands that must not be retried.
         """
         actions = self._recent_actions
         success = self._recent_success
 
         parts: list[str] = []
 
-        # Pattern 1: same action repeated
+        # Explicit blacklist — name the forbidden commands so the LLM can't miss them
+        if self._blacklisted:
+            cmd_list = "\n".join(f"  • {cmd}" for cmd in sorted(self._blacklisted))
+            parts.append(
+                f"FORBIDDEN COMMANDS — each has failed {self._BLACKLIST_THRESHOLD}+ times "
+                f"and must NOT be issued again under any circumstances:\n{cmd_list}\n"
+                f"Choose a completely different action."
+            )
+
+        # Pattern 1: same action repeated consecutively (catches early spirals before blacklist kicks in)
         if len(actions) >= self._REPEAT_THRESHOLD:
             tail = actions[-self._REPEAT_THRESHOLD:]
-            if len(set(tail)) == 1:
+            if len(set(tail)) == 1 and tail[0] not in self._blacklisted:
                 parts.append(
-                    f"WARNING: You have repeated '{tail[0]}' {self._REPEAT_THRESHOLD} "
-                    f"times and it keeps failing. Do NOT try this command again. "
-                    f"Try a completely different approach."
+                    f"WARNING: '{tail[0]}' has been repeated {self._REPEAT_THRESHOLD} times "
+                    f"consecutively and keeps failing. Do NOT issue it again."
                 )
 
         # Pattern 2: everything in the window failed
@@ -111,8 +131,8 @@ class BaseAgent(ABC):
             if not any(window):
                 parts.append(
                     f"WARNING: Your last {self._FAIL_WINDOW} actions ALL failed. "
-                    f"Stop and reconsider your strategy. Try a different system "
-                    f"or a different sequence of steps."
+                    f"Stop and reconsider your strategy entirely. Try a different "
+                    f"system or a different sequence of steps."
                 )
 
         return "\n".join(parts)

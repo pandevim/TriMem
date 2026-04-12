@@ -22,6 +22,9 @@ Token cost profile:
                   — same token cost as Visual Bus, but higher-quality
                     RAG context should reduce hallucinations and loops
 """
+import math
+import re
+
 from agents.base_agent import BaseAgent
 from memory.visual_bus import VisualBus
 from memory.rag_store import RAGStore
@@ -45,7 +48,8 @@ CRITICAL RULES:
     scan <record> with <system>      — scan a record using a security tool
     run <script>                     — execute a script on the current system
 - If you get "Syntax error" or "Command executed but returned no results", your syntax was wrong. Fix it.
-- Follow prerequisites: you must access a system before downloading from it.
+- Follow prerequisites: you must access a system before downloading from it,
+  and you must query a system before uploading to it.
 - If a command keeps failing, do NOT repeat it. Try a different approach.
 
 MEMORY SYSTEM:
@@ -76,16 +80,75 @@ class VisualBusRAGAgent(BaseAgent):
         self._raw_history: list[dict] = []
         self.goal = ""
         self.current_location = "unknown"
+        # Entities (systems, record IDs) seen in successful env responses.
+        # Used to detect hallucinated targets in the agent's actions.
+        self._seen_entities: set[str] = set()
         self._init_loop_guard()
 
     def reset(self, goal: str):
         self._raw_history = []
         self.goal = goal
         self.current_location = "unknown"
+        self._seen_entities = set()
         self.rag.reset()
         self._init_loop_guard()
         task_slug = goal[:40].replace(" ", "_")
         self.visual_bus.reset(task_slug)
+
+    # ------------------------------------------------------------------
+    # Helpers: entity tracking, spatial-hallucination detection, entropy
+    # ------------------------------------------------------------------
+
+    def _update_seen_entities(self, observation: str, succeeded: bool, turn: int) -> None:
+        """Populate _seen_entities from environment responses.
+
+        Turn 0 is the initial gateway listing — add everything regardless of
+        success/failure. Subsequent turns only add from successful responses
+        so the agent can't learn entity names from error messages.
+        """
+        if turn == 0 or succeeded:
+            for e in RAGStore.extract_entities(observation):
+                self._seen_entities.add(e.lower())
+            # Also parse the "Available systems are: X, Y, Z" preamble at turn 0
+            if turn == 0:
+                m = re.search(r'available systems[^:]*:\s*([^.]+)', observation.lower())
+                if m:
+                    for s in m.group(1).split(","):
+                        self._seen_entities.add(s.strip().strip("."))
+
+    def _is_spatial_hallucination(self, action: str) -> bool:
+        """Return True if the action references an entity the agent has never seen.
+
+        An entity is "seen" if it appeared in any prior successful env response
+        (or in the initial system listing at turn 0). Actions that target
+        completely unknown systems or records are spatial hallucinations.
+        """
+        if not self._seen_entities:
+            return False
+        # Extract underscore-joined IDs (invoice_1, procurement_db) and
+        # "word N" pairs (invoice 1) from the action string.
+        targets = set(re.findall(r'[a-z][a-z0-9]*(?:_[a-z0-9]+)+', action.lower()))
+        targets |= set(re.findall(r'(?<![a-z])[a-z]+[ ]\d+(?!\d)', action.lower()))
+        unknown = targets - self._seen_entities
+        return bool(unknown)
+
+    def _compute_entropy(self, window: int = 10) -> float:
+        """Shannon entropy of the action distribution over the last `window` turns.
+
+        Returns 0.0 when the agent is stuck issuing the same command, and 1.0
+        when every action in the window is unique. Returns -1.0 when there is
+        not enough history yet (< 2 turns).
+        """
+        recent = self._recent_actions[-window:]
+        if len(recent) < 2:
+            return -1.0
+        counts: dict[str, int] = {}
+        for a in recent:
+            counts[a] = counts.get(a, 0) + 1
+        n = len(recent)
+        H = -sum((c / n) * math.log2(c / n) for c in counts.values())
+        max_H = math.log2(n)
+        return round(H / max_H, 3) if max_H > 0 else 0.0
 
     def act(self, observation: str, turn: int) -> tuple[str, TurnMetric]:
         # --- Track current system from last access command ---
@@ -100,7 +163,13 @@ class VisualBusRAGAgent(BaseAgent):
             s in observation.lower()
             for s in ("syntax error", "returned no results", "access denied")
         )
-        self.rag.store_observation(turn, self.current_location, observation)
+        # Track entities seen in successful responses for hallucination detection.
+        self._update_seen_entities(observation, succeeded, turn)
+        # The observation received at turn N is the result of the action taken at
+        # turn N-1, so label it as turn N-1 to stay consistent with store_fact below.
+        # Turn 0 is the initial environment description — no prior action, keep label 0.
+        obs_turn = turn - 1 if turn > 0 else 0
+        self.rag.store_observation(obs_turn, self.current_location, observation)
         # Also store the action→outcome pair so RAG can recall failures
         if last_action and turn > 0:
             outcome = "succeeded" if succeeded else "FAILED"
@@ -166,20 +235,21 @@ class VisualBusRAGAgent(BaseAgent):
         self._raw_history.append({"role": "assistant", "content": action})
 
         syntactic_error = "syntax error" in observation.lower()
-        spatial_hallucination = (
-            ("syntax error" in observation.lower() or "returned no results" in observation.lower())
-            and turn > 3
-            and any(action.startswith(p) for p in ["access ", "download ", "upload ", "query "])
-        )
+        # Spatial hallucination: the action references a system/record the agent
+        # has never seen in any prior successful environment response.
+        spatial_hallucination = self._is_spatial_hallucination(action)
+        # Entropy: 0 = stuck repeating one command, 1 = fully diverse, -1 = too early
+        entropy_score = self._compute_entropy()
 
         metric = TurnMetric(
             turn=turn,
             action=action,
             observation=observation,
-            success=False,
+            success=False,  # overwritten by the runner after env.step()
             tokens_in=resp.tokens_in,
             tokens_out=resp.tokens_out,
             memory_source="visual_bus_rag",
+            entropy_score=entropy_score,
             latency_ms=resp.latency_ms,
             syntactic_error=syntactic_error,
             spatial_hallucination=spatial_hallucination,
