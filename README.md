@@ -689,12 +689,15 @@ python frontend/app.py
 4. Run `python run_benchmark.py --agent visual_bus_rag --tasks 5` and compare against Visual Bus and RAG alone
 5. Key measurement: does targeted RAG reduce spatial hallucinations and syntactic errors vs. Phase 3?
 
-### Known Visual Bus Issues (from initial runs)
+### Resolved Visual Bus Issues
 
-- **Spatial hallucinations remain high** — agent still "remembers" successful connections to systems that actually failed, causing long loops on the same action. Compressed recall is losing failure signals.
-- **CoT leakage into actions** — on ~1 in 6 turns the model hits the output token cap mid-reasoning and the raw `<think>` chain is emitted as the action, producing syntactic errors with ~7.7s latency vs ~2.7s on clean turns. Tighten the action extractor or cap CoT length.
+- **Spatial hallucinations** — ✅ Fixed. Failed observations are now rendered in yellow with "OBS FAILED" labels in the visual timeline (`memory/visual_bus.py`), so OCR preserves the failure signal instead of blurring it into success.
+- **CoT leakage into actions** — ✅ Fixed. `BaseAgent.parse_action()` now handles orphaned reasoning (truncated `<think>` blocks) by extracting the last embedded command verb from the reasoning text.
+- **Loop detection / recovery** — ✅ Fixed. `BaseAgent` now includes a repeat guard (same action 3+ times) and failure-rate guard (last 5 all failed), injecting explicit warnings into the agent's prompt.
+
+### Remaining Issues
+
 - **Entropy score wired but inert** — all turns report `entropy_score = -1.0`. Needs real logit-derived entropy before Phase 4 routing can use it.
-- **No loop-detection / recovery** — once a session breaks, the agent hammers the same failing command for 10+ turns. Need a repetition guard or backoff heuristic.
 
 ### Then: Phase 4 — Entropy Router
 

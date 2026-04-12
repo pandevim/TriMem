@@ -76,12 +76,14 @@ class VisualBusRAGAgent(BaseAgent):
         self._raw_history: list[dict] = []
         self.goal = ""
         self.current_location = "unknown"
+        self._init_loop_guard()
 
     def reset(self, goal: str):
         self._raw_history = []
         self.goal = goal
         self.current_location = "unknown"
         self.rag.reset()
+        self._init_loop_guard()
         task_slug = goal[:40].replace(" ", "_")
         self.visual_bus.reset(task_slug)
 
@@ -141,6 +143,11 @@ class VisualBusRAGAgent(BaseAgent):
         if rag_context:
             user_content_parts.append(rag_context)
 
+        # Inject loop warning if the agent is stuck
+        loop_warn = self._loop_warning()
+        if loop_warn:
+            user_content_parts.append(loop_warn)
+
         user_msg = "\n\n".join(user_content_parts)
 
         # LLM sees one message (compressed context + current obs + targeted facts)
@@ -150,6 +157,9 @@ class VisualBusRAGAgent(BaseAgent):
         )
 
         action = self.parse_action(resp.text)
+
+        # Record outcome for loop detection (succeeded already computed above)
+        self._record_outcome(action, succeeded)
 
         # Append raw obs + action to local history for next turn's rendering
         self._raw_history.append({"role": "user", "content": observation})

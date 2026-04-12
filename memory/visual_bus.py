@@ -30,9 +30,14 @@ from configs.settings import (
 
 # Colours for the rendered history image
 _COLOUR_BG = (18, 18, 24)          # dark background
-_COLOUR_OBS = (100, 180, 255)      # blue — environment observations
-_COLOUR_ACT = (255, 110, 110)      # red  — agent actions
-_COLOUR_TURN = (120, 120, 140)     # grey — turn label
+_COLOUR_OBS = (100, 180, 255)      # blue  — successful environment observations
+_COLOUR_OBS_FAIL = (255, 200, 60)  # yellow — failed observations (error/denied)
+_COLOUR_ACT = (255, 110, 110)      # red   — agent actions
+_COLOUR_TURN = (120, 120, 140)     # grey  — turn label
+
+# Keywords that indicate a failed observation — used to colour-code failures
+# in the rendered image so OCR preserves the failure signal.
+_FAIL_KEYWORDS = ("syntax error", "returned no results", "access denied")
 
 
 def _find_monospace_font(size: int):
@@ -102,8 +107,14 @@ def render_history(
         content = msg.get("content", "")
 
         if role == "user":
-            label = f"── Turn {turn_num} | OBS "
-            colour = _COLOUR_OBS
+            # Detect failed observations and render them distinctly
+            is_fail = any(kw in content.lower() for kw in _FAIL_KEYWORDS)
+            if is_fail:
+                label = f"── Turn {turn_num} | OBS FAILED "
+                colour = _COLOUR_OBS_FAIL
+            else:
+                label = f"── Turn {turn_num} | OBS "
+                colour = _COLOUR_OBS
         else:
             label = f"── Turn {turn_num} | ACT "
             colour = _COLOUR_ACT
@@ -232,10 +243,14 @@ class VisualBus:
         lines = []
         turn = max(0, len(history) // 2 - len(recent) // 2)
         for msg in recent:
-            role = "OBS" if msg["role"] == "user" else "ACT"
-            if role == "ACT":
+            content = msg["content"]
+            if msg["role"] == "user":
+                is_fail = any(kw in content.lower() for kw in _FAIL_KEYWORDS)
+                tag = "OBS FAILED" if is_fail else "OBS"
+            else:
+                tag = "ACT"
                 turn += 1
-            lines.append(f"[Turn {turn} {role}] {msg['content'][:200]}")
+            lines.append(f"[Turn {turn} {tag}] {content[:200]}")
         return "\n".join(lines)
 
     # ------------------------------------------------------------------
