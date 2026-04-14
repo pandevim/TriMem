@@ -1,0 +1,178 @@
+\documentclass[conference]{IEEEtran}
+\IEEEoverridecommandlockouts
+% The preceding line is only needed to identify funding in the first footnote. If that is unneeded, please comment it out.
+\usepackage{cite}
+\usepackage{amsmath,amssymb,amsfonts}
+\usepackage{algorithmic}
+\usepackage{graphicx}
+\usepackage{textcomp}
+\usepackage{xcolor}
+\usepackage{booktabs}
+\usepackage{multirow}
+\usepackage{tabularx}
+\usepackage{dblfloatfix}
+\usepackage{hyperref}
+
+\def\BibTeX{{\rm B\kern-.05em{\sc i\kern-.025em b}\kern-.08em
+    T\kern-.1667em\lower.7ex\hbox{E}\kern-.125emX}}
+
+\begin{document}
+
+\title{Tri-Mem: Ontology-Matched Memory Hierarchies for Multi-Agent Orchestration\\
+}
+
+\author{\IEEEauthorblockN{Aniruddha Pandey}
+\IEEEauthorblockA{\textit{Department of Computer Science} \\
+\textit{Stevens Institute of Technology}\\
+apandey10@stevens.edu}
+}
+
+\maketitle
+
+\begin{abstract}
+Current agentic AI systems suffer from context rot and severe token inefficiencies over long-horizon tasks because they force all cognitive functions---rules, episodic interaction history, and exact variables---into a single text-based context window. We introduce Tri-Mem, a research architecture that argues agent memory should not be one-size-fits-all. Tri-Mem assigns distinct cognitive functions to the data modality that appears cheapest and most accurate for that function. Drawing inspiration from human cognitive architecture, Tri-Mem is divided into Semantic Memory (powered by \emph{Memory Sparse Attention} over latent KV chunks) for static rule-following, Episodic Working Memory (utilizing visual bus compression) for chronological interaction history, and Declarative Memory (employing text-based RAG) for exact fact retrieval. Furthermore, we introduce an uncertainty-guided Entropy Router that dynamically routes memory access based on the model's epistemic uncertainty. In our reported NovaCorp AuditBench configuration, Tri-Mem reduces cumulative token cost by 84\% versus the text-only baseline and eliminates the benchmark's measured spatial hallucination and syntactic failure events. This modality-to-function mapping offers a potentially scalable framework for multi-agent orchestration.
+\end{abstract}
+
+\begin{IEEEkeywords}
+Multi-Agent Systems, LLM Memory, Visual Compression, RAG, Memory Sparse Attention, Entropy Routing
+\end{IEEEkeywords}
+
+\section{Introduction}
+As Large Language Models (LLMs) are deployed in increasingly complex, long-horizon multi-agent systems, they are hindered by a fundamental architectural bottleneck: the homogeneous, text-only context window. In standard agentic deployments, developers append standard operating procedures (SOPs), system documentation, multi-turn interaction logs, and retrieved database strings into a single, expanding text prompt. This paradigm induces three cascading failures. First, \textit{context rot} (the "lost in the middle" phenomenon) occurs as conversation history grows, causing models to drop critical instructions \cite{liu2023lost}. Second, systems incur a massive \textit{compute tax} by forcing the model to re-attend to static rulebooks at every turn. Finally, agents experience a \textit{modality-memory mismatch}, where highly verbose textual representations are inefficient for spatial or episodic recall, while visually compressed memories suffer lossy recall of exact alphanumeric strings.
+
+To address these challenges, we present \textbf{Tri-Mem}, a modality-matched memory hierarchy for multi-agent orchestration. The core proposition of Tri-Mem is \textit{Modality-to-Function Mapping}: specific types of agentic thought require specific data modalities to optimize compute and fidelity limits. 
+
+We map the architecture directly to human cognitive structures, partitioning memory into three modality-distinct layers:
+\begin{enumerate}
+    \item \textbf{Semantic Memory (MSA):} A sparse-attention KV chunk layer for static rules and deep reasoning.
+    \item \textbf{Episodic Working Memory (Visual Bus):} Compressed image patches for interaction history and spatial navigation.
+    \item \textbf{Declarative Memory (RAG):} Discrete text tokens retrieved from a vector database for exact string lookups (e.g., API keys, object IDs).
+\end{enumerate}
+
+Furthermore, we introduce an \textit{Entropy Router} that utilizes the model's raw logit confidence (Shannon Entropy) to dynamically route queries to the correct memory layer, preventing costly and latency-heavy LLM-based reasoning for simple memory retrieval.
+
+In our reported NovaCorp AuditBench experiments, replacing the homogeneous text context with a Tri-Mem architecture is associated with longer usable task horizons, lower cumulative token costs, and fewer syntax-related failures than the text-only baseline.
+
+\section{Related Work and Motivation}
+
+\subsection{Dividing Memory in LLM Agents}
+The cognitive foundation for dividing agent memory into distinct functional layers has been explored in recent literature. For example, \textit{Project Synapse} (Jan. 2026) presents a hierarchical multi-agent framework with hybrid memory for last-mile delivery disruptions, while \textit{Memory Management and Contextual Consistency for Long-Running Low-Code Agents} (Sept. 2025) proposes episodic and semantic memory with an ``Intelligent Decay'' mechanism for LCNC agents. These works motivate structured memory design, but neither paper establishes the exact modality-specialized hierarchy proposed here. In particular, the low-code agent paper remains text-centric, and \textit{Project Synapse} is primarily a task-oriented orchestration framework rather than a modality-routed memory architecture.
+
+\subsection{Visual Token Compression for Episodic History}
+Text is suboptimal for episodic history, which is often verbose but structurally simple. The motivation for utilizing visual compression for agent interaction history stems from \textit{DeepSeek-OCR: Contexts Optical Compression}, which explores optical 2D mapping for long-context compression in document processing. Building upon this, \textit{AgentOCR: Reimagining Agent History via Optical Self-Compression} (Jan. 2026) introduced Segment Optical Caching for agent histories represented as visual tokens. Similarly, \textit{Vision-centric Token Compression in Large Language Model} (Feb. 2025) proposed the Vist framework, where distant tokens are rendered into images and compressed with a lightweight vision encoder. Tri-Mem adapts these ideas to form the ``Visual Bus,'' compressing long interaction traces into image tiles to reduce token pressure.
+
+\subsection{Semantic Memory via Memory Sparse Attention (MSA)}
+Standard agents pay a heavy computational tax re-reading static rulebooks at every turn. We draw inspiration from EverMind's \textit{MSA: Memory Sparse Attention for Efficient End-to-End Memory Model Scaling to 100M Tokens} (March 2026), which introduced a sparse latent-memory framework with document-wise RoPE, KV compression, and top-$k$ retrieval over memory segments. MSA allows the model to pre-compute heavy document states into latent tensors and attend to them dynamically. Tri-Mem incorporates this style of MSA as the foundational Semantic Memory layer, freezing complex organizational logic out of the active token stream.
+
+\section{The Tri-Mem Architecture}
+
+The Tri-Mem architecture routes incoming data (user prompts, environmental observations, and system events) through three distinct, modality-specific layers coordinated by an Entropy Router.
+
+\subsection{Semantic Memory (MSA): The Rulebook}
+The Semantic Memory layer is responsible for deep reasoning, system prompts, SOPs, and API documentation. Textual rulebooks are chunked, mean-pooled, and pre-computed into $K$ and $V$ tensors alongside a routing key $K_r$. During online inference, the live query is projected to a routing query $Q_r$ and cosine-similarity matched against stored $K_r$. The top-$k$ chunks are streamed directly into the GPU and concatenated with the active context in a single attention pass. Because this relies on Document-wise RoPE (Rotary Position Embedding), the agent can consult immense rulebooks with zero position drift, effectively removing static instructions from the dynamic context window and eliminating the rulebook compute tax.
+
+\subsection{Episodic Working Memory (Visual Bus): The Scratchpad}
+To prevent context rot, the Visual Bus acts as the agent's episodic scratchpad, containing step-by-step history, terminal outputs, and intermediary thoughts. Instead of appending verbose text logs, the agent's observation-action deltas are rendered into highly compressed image patches using Segment Optical Caching. The multimodal LLM processes its own timeline as a visual sequence. This spatial representation protects the "middle" of the history from attention degradation, ensuring that the chronology of a long task is preserved at a fraction of the token cost.
+
+\subsection{Declarative Memory (RAG): The Fact Injector}
+While visual compression excels at timeline preservation, it fails at syntactic fidelity---a phenomenon we term the \textit{Syntactic Action Gap}. When an agent compresses its history, exact alphanumeric strings (API keys, IP addresses) become visually blurred. Tri-Mem introduces a Retrieval-Augmented Generation (RAG) declarative memory layer to bridge this gap. When the visual memory indicates that a specific entity was encountered, the agent issues a discrete query to a vector database, guaranteeing the lossless injection of exact text tokens back into the execution stream.
+
+\subsection{The Entropy Router \& Bayesian Calibration}
+To orchestrate these layers without adding massive latency through LLM "think-aloud" prompting, Tri-Mem employs an Uncertainty-Guided Entropy Router based on Shannon Entropy. Our motivation is also informed by recent Google Research work on ``teaching LLMs to reason like Bayesians,'' which argues that effective agents should maintain and update probabilistic beliefs as new evidence arrives; Tri-Mem operationalizes a related intuition through entropy-triggered memory selection rather than supervised Bayesian-teaching post-training \cite{googlebayes2026}:
+\begin{equation}
+H(X) = -\sum p(x) \log_2 p(x)
+\end{equation}
+By monitoring the raw output logit confidence, the router directs execution:
+\begin{itemize}
+    \item \textbf{Low Entropy ($< 0.3$):} High confidence. The agent relies on internal MSA/context to execute actions.
+    \item \textbf{Medium Entropy ($0.3 - 0.7$):} Environmental uncertainty. The router injects Visual Bus patches to update episodic beliefs.
+    \item \textbf{High Entropy ($> 0.7$):} Epistemic uncertainty. The router halts generation and queries RAG for an exact string lookup.
+\end{itemize}
+
+\section{Multi-Agent Orchestration Extension}
+In traditional multi-agent frameworks, agents pass full conversation transcripts, compounding token costs and context rot across the network. Tri-Mem intrinsically scales to multi-agent environments. Semantic memory (MSA) remains strictly local to each specialized agent (e.g., coder vs. reviewer). The Visual Bus becomes the \textit{shared episodic medium}, allowing Agent B to ingest Agent A's entire narrative arc instantly via a compressed image tile. The RAG vector database serves as the single source of truth for exact state variables. The Entropy Router handles not only intra-agent memory selection but inter-agent delegation, forwarding high-entropy state requests to peer agents.
+
+\section{Experimental Evaluation}
+
+\begin{table*}[!t]
+\centering
+\caption{Performance Metrics on NovaCorp AuditBench (Single Task: Vendor Invoice Audit)}
+\label{tab:metrics}
+\begin{tabularx}{\textwidth}{@{} l X r r r r r @{}}
+\toprule
+\textbf{Metric} & \textbf{What It Measures} & \textbf{Phase 1} & \textbf{Phase 2} & \textbf{Phase 3} & \textbf{Phase 4} & \textbf{Phase 5} \\
+& & (Baseline) & (RAG) & (Visual Bus) & (VBus+RAG) & (MSA) \\
+\midrule
+\textbf{Success Rate} & Task completion percentage & 1.0 & 1.0 & 1.0 & 1.0 & 1.0 \\
+\textbf{Total Token Cost} & Total tokens (in + out) over task & 45,169 & 262,147 & 58,155 & 7,119 & 29,026 \\
+\textbf{Resolution Length} & Total turns to solve (lower is better) & 41 & 48 & 36 & 7 & 6 \\
+\textbf{Syntactic Failure} & Environment "Syntax error" responses & 0 & 0 & 6 & 0 & 0 \\
+\textbf{Spatial Hallucination} & Interacting with non-reachable systems & 25 & 34 & 19 & 0 & 0 \\
+\bottomrule
+\end{tabularx}
+\end{table*}
+
+\subsection{Benchmark Design: NovaCorp AuditBench}
+To simultaneously stress-test semantic rule-following, episodic timeline recall, and exact fact retrieval, we developed the NovaCorp AuditBench. It simulates a mid-size SaaS company undergoing an IT procurement and security audit across dozens of records, credential vaults, and distractor systems. Task completion requires strict sequential SOP validation over 36--48+ turn horizons.
+
+\subsection{Evaluation Phases and Metrics}
+We phased the implementation and benchmarking to isolate the contribution of each modality. 
+
+\begin{itemize}
+    \item \textbf{Phase 1 (Baseline):} Standard agent utilizing full text-history appending.
+    \item \textbf{Phase 2 (RAG):} Baseline augmented with continuous RAG fact retrieval.
+    \item \textbf{Phase 3 (Visual Bus):} Episodic history compressed into OCR-readable image tiles.
+    \item \textbf{Phase 4 (Visual Bus + RAG):} Fused approach to solve the Syntactic Action Gap. Entities extracted from the visual summary guide targeted RAG lookups.
+    \item \textbf{Phase 5 (MSA Fusion):} Integration of Semantic Memory for SOP routing, removing static rules from the active token stream.
+\end{itemize}
+
+We define two custom failure metrics:
+\begin{itemize}
+    \item \textbf{Spatial Hallucination Rate:} The frequency at which the agent attempts to interact with non-reachable systems or rejected records (indicates episodic memory failure).
+    \item \textbf{Syntactic Failure Rate:} Environment rejection due to malformed commands or hallucinated exact-strings (indicates declarative memory failure).
+\end{itemize}
+
+\subsection{Results and Discussion}
+Table \ref{tab:metrics} details the experimental results. 
+
+\textbf{The Token Economy Paradox:} In the reported benchmark run, continuous RAG (Phase 2) preserves exact retrieval but greatly amplifies token context (262,147 tokens) compared to the baseline (45,169). The Visual Bus (Phase 3) flattens this curve, but introduces Syntactic Failures (6 errors) because visual compression can blur exact syntax.
+
+\textbf{Bridging the Syntactic Action Gap:} Phase 4 (Visual Bus + RAG) supports our core hypothesis within this benchmark configuration. By using visual memory to identify \textit{what} to look for, and RAG to retrieve the \textit{exact string}, token consumption drops to 7,119 tokens, resolution length shortens to 7 turns, and both measured Spatial Hallucinations and Syntactic Failures fall to zero.
+
+\textbf{MSA Optimization:} Phase 5 suggests that pre-computing the 40-page IT policy into latent semantic space can reduce active-context load; in this benchmark run, the agent finishes in 6 turns with zero measured hallucination events.
+
+\section{Conclusion and Future Work}
+Tri-Mem argues that agent memory should not be monolithic. By mapping semantic rules to latent MSA chunks, episodic history to compressed visual patches, and exact facts to discrete textual RAG, our benchmark results indicate a longer functional horizon and lower computational overhead than a text-only baseline. The Entropy Router provides a lightweight policy for arbitrating these modalities based on intrinsic uncertainty rather than additional LLM prompting. 
+
+Future work will expand the Bayesian calibration of the underlying models to yield mathematically rigorous entropy scores, and we will benchmark Tri-Mem's inter-agent shared visual bus on massive, multi-agent cooperative tasks across broader environments like WebArena and EcoGym.
+
+\bibliographystyle{IEEEtran}
+\begin{thebibliography}{1}
+
+\bibitem{synapse2026}
+A. G. Yadav, V. Dherange, and K. Shivam, ``Project Synapse: A Hierarchical Multi-Agent Framework with Hybrid Memory for Autonomous Resolution of Last-Mile Delivery Disruptions,'' \textit{arXiv preprint arXiv:2601.08156}, 2026.
+
+\bibitem{lowcode2025}
+J. Xu, ``Memory Management and Contextual Consistency for Long-Running Low-Code Agents,'' \textit{arXiv preprint arXiv:2509.25250}, 2025.
+
+\bibitem{deepseekocr}
+H. Wei, Y. Sun, and Y. Li, ``DeepSeek-OCR: Contexts Optical Compression,'' \textit{arXiv preprint arXiv:2510.18234}, 2025.
+
+\bibitem{agentocr2026}
+L. Feng, F. Yang, F. Chen, X. Cheng, H. Xu, Z. Wan, M. Yan, and B. An, ``AgentOCR: Reimagining Agent History via Optical Self-Compression,'' \textit{arXiv preprint arXiv:2601.04786}, 2026.
+
+\bibitem{vist2025}
+L. Xing, A. J. Wang, R. Yan, X. Shu, and J. Tang, ``Vision-centric Token Compression in Large Language Model,'' \textit{arXiv preprint arXiv:2502.00791}, 2025.
+
+\bibitem{evermind2026}
+Y. Chen, R. Chen, S. Yi, X. Zhao, X. Li, J. Zhang, J. Sun, C. Hu, Y. Han, L. Bing, Y. Deng, and T. Chen, ``MSA: Memory Sparse Attention for Efficient End-to-End Memory Model Scaling to 100M Tokens,'' \textit{arXiv preprint arXiv:2603.23516}, 2026.
+
+\bibitem{googlebayes2026}
+S. van Steenkiste and T. Linzen, ``Teaching LLMs to reason like Bayesians,'' Google Research Blog, Mar. 4, 2026.
+
+\bibitem{liu2023lost}
+N. F. Liu, K. Lin, J. Hewitt, A. Paranjape, M. Bevilacqua, S. Petroni, and P. Liang, ``Lost in the middle: How language models use long contexts,'' \textit{arXiv preprint arXiv:2307.03172}, 2023.
+
+\end{thebibliography}
+
+\end{document}
