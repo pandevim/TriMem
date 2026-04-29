@@ -178,6 +178,7 @@ class VisualBus:
             return False
 
         try:
+            import torch
             from transformers import AutoProcessor, AutoModelForImageTextToText
 
             print(f"[VisualBus] Loading OCR model ({OCR_MODEL_NAME}) …", flush=True)
@@ -185,7 +186,7 @@ class VisualBus:
             self._ocr_processor = AutoProcessor.from_pretrained(OCR_MODEL_NAME)
             self._ocr_model = AutoModelForImageTextToText.from_pretrained(
                 OCR_MODEL_NAME,
-                torch_dtype="auto",
+                torch_dtype=torch.float16,
                 device_map="auto",
             )
             self._ocr_model.eval()
@@ -290,6 +291,7 @@ class VisualBus:
             compressed = self._run_ocr(img_path)
         except Exception as e:
             print(f"[VisualBus] WARNING: OCR inference failed ({e}). Using text fallback.", flush=True)
+            VisualBus._ocr_unavailable = True
             return self._text_fallback(history)
         ocr_ms = (time.time() - t1) * 1000
 
