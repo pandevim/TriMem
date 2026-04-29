@@ -114,9 +114,14 @@ In traditional multi-agent frameworks, agents pass full conversation transcripts
 \textbf{Success Rate} & Task completion percentage & 1.0 & 1.0 & 1.0 & 1.0 & 1.0 & 1.0 \\
 \textbf{Total Token Cost} & Total tokens (in + out) over task & 45,169 & 262,147 & 58,155 & 7,119 & 29,026 & 31,606 \\
 \textbf{Resolution Length} & Total turns to solve (lower is better) & 41 & 48 & 36 & 7 & 6 & 6 \\
-\textbf{Syntactic Failure} & Environment "Syntax error" responses & 0 & 0 & 6 & 0 & 0 & 0 \\
+\textbf{Syntactic Failure} & Environment ``Syntax error'' responses & 0 & 0 & 6 & 0 & 0 & 0 \\
 \textbf{Spatial Hallucination} & Interacting with non-reachable systems & 25 & 34 & 19 & 0 & 0 & 0 \\
+\textbf{Memory Source} & Modality routed per turn & text & rag & vbus & vb+rag & msa & 17/67/17\%$^{\dagger}$ \\
+\textbf{Avg Latency per Turn (s)} & Inference + (probe + OCR + RAG) overhead & --- & --- & 2.7 & 1.7 & 1.2 & 0.9$^{\ddagger}$ \\
+\textbf{Wall-Clock Duration (s)} & Time from \texttt{reset()} to \texttt{done=True} & --- & --- & 817.5 & 93.5 & 19.5 & 38.1 \\
 \bottomrule
+\multicolumn{8}{@{}l}{\footnotesize $^{\dagger}$ msa / msa+vbus / msa+vbus+rag band split for Tri-Mem on this single task; the seven-task aggregate is 5\,/\,60\,/\,35\%.} \\
+\multicolumn{8}{@{}l}{\footnotesize $^{\ddagger}$ MED-band steady-state average; LOW-band turns drop to $\approx 0.5$\,s because the Visual Bus OCR pass is skipped. Cold-start turn 0 is excluded.}
 \end{tabularx}
 \end{table*}
 
