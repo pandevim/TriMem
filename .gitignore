@@ -27,3 +27,13 @@ Thumbs.db
 # Environment variables
 .env
 
+# Latex files
+*.aux
+*.log
+*.synctex.gz
+*.out
+*.nav
+*.snm
+*.toc
+*.bbl
+*.blg
