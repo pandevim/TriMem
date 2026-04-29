@@ -22,6 +22,7 @@ from configs.settings import (
     GPU_MEMORY_UTILIZATION,
     MAX_MODEL_LEN,
     ENABLE_PREFIX_CACHING,
+    VLLM_MAX_NUM_SEQS,
 )
 
 
@@ -111,6 +112,7 @@ class VLLMBackend:
             model=MODEL_NAME,
             gpu_memory_utilization=GPU_MEMORY_UTILIZATION,
             max_model_len=MAX_MODEL_LEN,
+            max_num_seqs=VLLM_MAX_NUM_SEQS,
             trust_remote_code=True,
             enable_prefix_caching=ENABLE_PREFIX_CACHING,
         )

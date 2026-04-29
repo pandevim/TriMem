@@ -8,6 +8,11 @@ MAX_TOKENS = 1024
 # vLLM-specific settings
 GPU_MEMORY_UTILIZATION = 0.90
 MAX_MODEL_LEN = 16384
+# Max concurrent sequences vLLM will schedule. We run one task at a time so a
+# small number is fine; 256 (vLLM's default) is way too many for Mamba/MoE
+# models like Qwen3.5-35B-A3B where each decode seq needs a dedicated Mamba
+# cache block, and the engine refuses to start if we don't have enough blocks.
+VLLM_MAX_NUM_SEQS = 16
 
 # --- Agent ---
 MAX_AGENT_TURNS = 60
