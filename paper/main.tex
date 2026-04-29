@@ -90,8 +90,8 @@ H(X) = -\sum p(x) \log_2 p(x)
 \end{equation}
 By monitoring the raw output logit confidence, the router directs execution:
 \begin{itemize}
-    \item \textbf{Low Entropy ($< 0.3$):} High confidence. The agent relies on internal MSA/context to execute actions.
-    \item \textbf{Medium Entropy ($0.3 - 0.7$):} Environmental uncertainty. The router injects Visual Bus patches to update episodic beliefs.
+    \item \textbf{Low Entropy ($< 0.4$):} High confidence. The agent relies on internal MSA/context to execute actions.
+    \item \textbf{Medium Entropy ($0.4 - 0.7$):} Environmental uncertainty. The router injects Visual Bus patches to update episodic beliefs.
     \item \textbf{High Entropy ($> 0.7$):} Epistemic uncertainty. The router halts generation and queries RAG for an exact string lookup.
 \end{itemize}
 

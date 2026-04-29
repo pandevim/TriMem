@@ -44,13 +44,13 @@ OCR_MODEL_NAME = "zai-org/GLM-OCR"
 VISUAL_BUS_HISTORY_DIR = "/tmp/trimem_visual_bus"
 VISUAL_BUS_IMAGE_WIDTH = 1200     # pixel width of rendered history image
 VISUAL_BUS_FONT_SIZE = 14         # pt — monospace font size in rendered image
-MAX_VISUAL_TILES = 20             # max turns to keep in the visual history image
+MAX_VISUAL_TILES = 4              # max turns to keep in the visual history image
 
 # --- Entropy Router (Phase 4) ---
 # Thresholds are measured in bits of Shannon entropy on the first
 # generated token of a single-token probe pass with no memory injected.
 # Distribution is top-K + residual bucket (see utils/llm._shannon_with_residual).
-ENTROPY_LOW_THRESHOLD = 0.3   # below: MSA only (frozen rulebook)
+ENTROPY_LOW_THRESHOLD = 0.4   # below: MSA only (frozen rulebook)
 ENTROPY_MED_THRESHOLD = 0.7   # below: + Visual Bus; above: + RAG
 # Top-K considered when computing probe entropy. 20 is enough to capture
 # >99% of probability mass for a well-trained model on a structured task.

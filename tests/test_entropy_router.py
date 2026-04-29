@@ -99,7 +99,7 @@ def test_band_table(entropy, expected_band):
         (1.1451, BAND_HIGH),  # task 1, turn 0 — cold start
         (0.7447, BAND_HIGH),  # task 0, turn 0
         (0.6639, BAND_MED),   # task 0, turn 5 — just under MED
-        (0.3402, BAND_MED),   # task 1, turn 2 — minimum observed in that run
+        (0.3402, BAND_LOW),   # task 1, turn 2 — minimum observed; LOW band fires under 0.4 threshold
         (0.7910, BAND_HIGH),  # task 5, final-upload entropy spike
     ],
 )
