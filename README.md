@@ -336,22 +336,22 @@ Visual Needle-In-A-Haystack: 100 turns of visually compressed history, retrieve 
 
 ## Metrics to Track
 
-Every benchmark run must report (not just success rate). The rightmost columns show observed values from the `audit_vendor_invoice_0` single-task runs in [logs/](logs/) — Baseline / RAG / Visual Bus / MSA.
+Every benchmark run must report (not just success rate). The middle columns show observed values from the `audit_vendor_invoice_0` single-task runs in [logs/](logs/) — Baseline / RAG / Visual Bus / VBus+RAG / MSA. The Tri-Mem column is the entropy-routed agent; values to be filled after the first GPU run.
 
-| Metric                          | What It Measures                                       | Which Layer It Tests                  | TurnMetric Field                           | Baseline          | RAG                | Visual Bus       | VBus+RAG          | MSA              |
-| ------------------------------- | ------------------------------------------------------ | ------------------------------------- | ------------------------------------------ | ----------------- | ------------------ | ---------------- | ----------------- | ---------------- |
-| **Success Rate**                | Task completion %                                      | Overall system                        | `TaskMetric.success`                       | 1.0               | 1.0                | 1.0              | 1.0               | 1.0              |
-| **Cumulative Token Cost**       | Total tokens (in + out) over N-turn task               | Visual Bus (should flatten the curve) | `tokens_in + tokens_out`                   | 45,169            | 262,147            | 58,155           | 7,119             | 29,026           |
-| **Action-to-Resolution Length** | Steps to solve (fewer = less context confusion)        | Visual Bus + MSA                      | `TaskMetric.total_turns`                   | 41                | 48                 | 36               | 7                 | 6                |
-| **Syntactic Failure Rate**      | Environment "Syntax error" responses                   | RAG (should drive to near-zero)       | `syntactic_error` (bool per turn)          | 0                 | 0                  | 6 ⚠️             | 0                 | 0                |
-| **Spatial Hallucination Rate**  | Interacting with non-reachable systems/records         | Visual Bus                            | `spatial_hallucination` (bool per turn)    | 25                | 34                 | 19               | 0                 | 0                |
-| **Token Exhaustion Threshold**  | Turn at which agent degrades/crashes                   | Visual Bus + MSA                      | derived from per-turn `tokens_in` curve    | n/a (passed)      | n/a (passed)       | n/a (passed)     | n/a (passed)      | n/a (passed)     |
-| **Memory Source Distribution**  | % of turns using MSA vs Visual Bus vs RAG              | Entropy Router                        | `memory_source`                            | 100% text         | 100% rag           | 100% visual_bus  | 100% vbus_rag     | 100% msa         |
-| **Router Accuracy**             | Did the router pick the right modality?                | Entropy Router                        | `memory_source` vs ground truth            | n/a (Phase 4)     | n/a (Phase 4)      | n/a (Phase 4)    | n/a (Phase 4)     | n/a (Phase 4)    |
-| **Latency per Turn**            | Time per decision (router + inference overhead)        | Router efficiency                     | `latency_ms`                               | tracked           | tracked            | ~2.7s normal / ~7.7s on CoT-overflow turns | ~1.7s avg / ~9.4s cold start (OCR) | ~1.2s steady / 11.7s cold start |
-| **Cost per Task**               | USD cost comparison across agents                      | Token economics                       | `TaskMetric.total_cost_usd`                | $0.00 (local)     | $0.00 (local)      | $0.00 (local)    | $0.00 (local)     | $0.00 (local)    |
-| **Entropy Score per Turn**      | Action diversity Shannon entropy (0=loop, 1=diverse)   | Loop detection                        | `entropy_score`                            | −1.0 (not wired)  | −1.0 (not wired)   | −1.0 (not wired) | 0.0–1.0 (wired)   | −1.0 (not wired) |
-| **Duration per Task**           | Wall-clock seconds to completion                       | End-to-end throughput                 | `TaskMetric.duration_s`                    | tracked           | tracked            | 817.5 s          | 93.5 s            | 19.5 s           |
+| Metric                          | What It Measures                                       | Which Layer It Tests                  | TurnMetric Field                           | Baseline          | RAG                | Visual Bus       | VBus+RAG          | MSA              | Tri-Mem (routed)        |
+| ------------------------------- | ------------------------------------------------------ | ------------------------------------- | ------------------------------------------ | ----------------- | ------------------ | ---------------- | ----------------- | ---------------- | ----------------------- |
+| **Success Rate**                | Task completion %                                      | Overall system                        | `TaskMetric.success`                       | 1.0               | 1.0                | 1.0              | 1.0               | 1.0              | (pending GPU run)       |
+| **Cumulative Token Cost**       | Total tokens (in + out) over N-turn task               | Visual Bus (should flatten the curve) | `tokens_in + tokens_out`                   | 45,169            | 262,147            | 58,155           | 7,119             | 29,026           | (pending GPU run)       |
+| **Action-to-Resolution Length** | Steps to solve (fewer = less context confusion)        | Visual Bus + MSA                      | `TaskMetric.total_turns`                   | 41                | 48                 | 36               | 7                 | 6                | (pending GPU run)       |
+| **Syntactic Failure Rate**      | Environment "Syntax error" responses                   | RAG (should drive to near-zero)       | `syntactic_error` (bool per turn)          | 0                 | 0                  | 6 ⚠️             | 0                 | 0                | (pending GPU run)       |
+| **Spatial Hallucination Rate**  | Interacting with non-reachable systems/records         | Visual Bus                            | `spatial_hallucination` (bool per turn)    | 25                | 34                 | 19               | 0                 | 0                | (pending GPU run)       |
+| **Token Exhaustion Threshold**  | Turn at which agent degrades/crashes                   | Visual Bus + MSA                      | derived from per-turn `tokens_in` curve    | n/a (passed)      | n/a (passed)       | n/a (passed)     | n/a (passed)      | n/a (passed)     | (pending GPU run)       |
+| **Memory Source Distribution**  | % of turns using MSA vs Visual Bus vs RAG              | Entropy Router                        | `memory_source`                            | 100% text         | 100% rag           | 100% visual_bus  | 100% vbus_rag     | 100% msa         | mix of msa / msa_vbus / msa_vbus_rag |
+| **Router Accuracy**             | Did the router pick the right modality?                | Entropy Router                        | `memory_source` vs ground truth            | n/a               | n/a                | n/a              | n/a               | n/a              | (pending GPU run + ground-truth labels) |
+| **Latency per Turn**            | Time per decision (router + inference overhead)        | Router efficiency                     | `latency_ms`                               | tracked           | tracked            | ~2.7s normal / ~7.7s on CoT-overflow turns | ~1.7s avg / ~9.4s cold start (OCR) | ~1.2s steady / 11.7s cold start | act + probe (pending) |
+| **Cost per Task**               | USD cost comparison across agents                      | Token economics                       | `TaskMetric.total_cost_usd`                | $0.00 (local)     | $0.00 (local)      | $0.00 (local)    | $0.00 (local)     | $0.00 (local)    | $0.00 (local)           |
+| **Entropy Score per Turn**      | First-token Shannon entropy of the probe pass (bits)   | Entropy Router                        | `entropy_score`                            | −1.0 (no probe)   | −1.0 (no probe)    | −1.0 (no probe)  | 0.0–1.0 (action-diversity, not logit-derived) | −1.0 (no probe) | bits, real (top-K logprobs + residual) |
+| **Duration per Task**           | Wall-clock seconds to completion                       | End-to-end throughput                 | `TaskMetric.duration_s`                    | tracked           | tracked            | 817.5 s          | 93.5 s            | 19.5 s           | (pending GPU run)       |
 
 ---
 
@@ -420,12 +420,21 @@ Simulate MSA with frozen long-context prompt. Implement Visual Bus with screensh
 - Measures: whether targeted RAG + Visual Bus together beat either alone on spatial hallucination rate and syntactic errors (the Syntactic Action Gap hypothesis)
 - `memory_source="visual_bus_rag"` per turn
 
-### Phase 4: + Entropy Router 🔲
+### Phase 4: + Entropy Router ✅ BUILT
 
-- Build routing logic monitoring model confidence (output logits / token probabilities)
-- Automatically decides: rely on internal context (low entropy), check Visual Bus (medium), query RAG (high)
-- This is where the architecture becomes "Tri-Mem"
-- Measures: router accuracy, latency overhead, overall performance improvement
+- `router/entropy.py`: pure threshold-based router. `route(entropy)` maps Shannon entropy (bits) to a `RouteDecision` with three bands:
+  - `H < ENTROPY_LOW_THRESHOLD` (0.3) → **MSA only** (frozen rulebook in cached system prompt)
+  - `0.3 ≤ H < ENTROPY_MED_THRESHOLD` (0.7) → **MSA + Visual Bus** (routed rulebook chunks + OCR-compressed timeline)
+  - `H ≥ 0.7` → **MSA + Visual Bus + RAG** (full stack with summary-guided fact lookups)
+  - `H = -1.0` (no probe / unsupported backend) → defaults to full stack so signal loss never silently degrades memory
+- `agents/trimem_agent.py`: `TriMemAgent` does **probe → route → generate** per turn:
+  1. Probe — single-token call with no memory injected, captures top-K logprobs (`ROUTER_PROBE_TOP_K=20`)
+  2. Compute first-token Shannon entropy (top-K + residual bucket)
+  3. Build the act-pass user message with the memory blocks the router selected
+  4. Final generation with the selected memory; emits `memory_source` matching the band label (`msa`, `msa_vbus`, `msa_vbus_rag`)
+- `utils/llm.py`: both vLLM and transformers backends accept `logprobs=N` and populate `LLMResponse.first_token_entropy`
+- Probe tokens + latency are added to the turn metric so cost reporting is honest about the router's overhead
+- Ablation knob: `ROUTER_ENABLED=False` in `configs/settings.py` disables the probe and forces full memory injection on every turn (equivalent to a 1+2+3 stacked agent)
 
 ### Phase 5: Frontend Dashboard ✅ BUILT (sample data, connects to live API)
 
@@ -456,13 +465,16 @@ tri-mem/
 │   ├── baseline_agent.py              # Phase 1: full text history agent
 │   ├── rag_agent.py                   # Phase 2: RAG-augmented agent
 │   ├── visual_bus_agent.py            # Phase 3: Visual Bus episodic memory agent
-│   ├── visual_bus_rag_agent.py         # Phase 3.5: Visual Bus + RAG combined agent
-│                                      #   - Summary-guided RAG: entities extracted from OCR
-│                                      #     summary drive targeted fact lookups
-│                                      #   - Action outcome tracking (success/fail in RAG)
-│   └── msa_agent.py                   # Phase 3.75: MSA semantic memory agent
-│                                      #   - Frozen rulebook system prompt (prefix cache hot)
-│                                      #   - Top-k routed chunks injected per turn
+│   ├── visual_bus_rag_agent.py        # Phase 3.5: Visual Bus + RAG combined agent
+│   │                                  #   - Summary-guided RAG: entities extracted from OCR
+│   │                                  #     summary drive targeted fact lookups
+│   │                                  #   - Action outcome tracking (success/fail in RAG)
+│   ├── msa_agent.py                   # Phase 3.75: MSA semantic memory agent
+│   │                                  #   - Frozen rulebook system prompt (prefix cache hot)
+│   │                                  #   - Top-k routed chunks injected per turn
+│   └── trimem_agent.py                # Phase 4: full Tri-Mem agent
+│                                      #   - Probe → route → generate per turn
+│                                      #   - Entropy-gated MSA / Visual Bus / RAG injection
 │
 ├── benchmarks/
 │   └── novacorp_audit_sim.py          # Simulated NovaCorp Audit environment
@@ -503,13 +515,18 @@ tri-mem/
 │                                      #   - Authoritative SOPs for all 6 task templates
 │                                      #   - ~11k chars, frozen in system prompt prefix
 │
-├── router/                            # Phase 4 (empty, to be built)
+├── router/
+│   └── entropy.py                     # Phase 4: pure threshold-based router
+│                                      #   - route(entropy) → RouteDecision (band + per-layer flags)
+│                                      #   - 3 bands: msa / msa_vbus / msa_vbus_rag
+│                                      #   - Thresholds in configs/settings.py
 │
 ├── utils/
 │   ├── llm.py                         # Unified LLM inference wrapper
 │   │                                  #   - VLLMBackend (fast GPU inference)
 │   │                                  #   - TransformersBackend (universal HF fallback)
 │   │                                  #   - Singleton pattern — model loads once, shared across agents
+│   │                                  #   - logprobs=N support → first_token_entropy on LLMResponse
 │   └── metrics.py                     # TurnMetric, TaskMetric, BenchmarkResult
 │                                      #   - Tracks per-turn: tokens, latency, memory source,
 │                                      #     entropy score, syntactic errors, spatial hallucinations
@@ -578,6 +595,14 @@ Ablate the two MSA paths independently by flipping `MSA_INJECT_FULL_RULEBOOK` / 
 python run_benchmark.py --agent visual_bus_rag --tasks 5
 ```
 
+### Run Phase 4 Tri-Mem Benchmark (Entropy-Routed)
+
+```bash
+python run_benchmark.py --agent trimem --tasks 5
+```
+
+Each turn does a 1-token probe, computes Shannon entropy on the top-K logprobs, and routes between MSA / MSA+VBus / MSA+VBus+RAG. Toggle `ROUTER_ENABLED=False` in `configs/settings.py` to ablate the router and force full memory injection on every turn.
+
 ### Run All and Compare
 
 ```bash
@@ -598,7 +623,7 @@ python frontend/app.py
 ### CLI Options
 
 ```
---agent {baseline,rag,visual_bus,visual_bus_rag,msa,all}   Which agent to benchmark
+--agent {baseline,rag,visual_bus,visual_bus_rag,msa,trimem,all}   Which agent to benchmark
 --tasks N                                   Number of tasks to run (default: 5)
 --quiet                                     Suppress per-turn output
 ```
@@ -645,6 +670,18 @@ python frontend/app.py
 - `ENABLE_PREFIX_CACHING=True` passed through to `vllm.LLM(...)` in `utils/llm.py`
 - Emits `memory_source="msa"` per turn — wired for the Phase 4 entropy router
 
+### ✅ Phase 4 — Entropy Router (Tri-Mem Agent)
+
+- `router/entropy.py`: pure `route(entropy) → RouteDecision` with three bands (`msa`, `msa_vbus`, `msa_vbus_rag`); thresholds configurable via `ENTROPY_LOW_THRESHOLD` / `ENTROPY_MED_THRESHOLD`
+- `agents/trimem_agent.py`: `TriMemAgent` runs **probe → route → generate** per turn:
+  - **Probe**: 1-token call with no memory injected, no system prompt baggage, `logprobs=ROUTER_PROBE_TOP_K`
+  - **Route**: first-token Shannon entropy (bits) over the top-K + residual bucket → band
+  - **Generate**: act-pass with the gated memory blocks; system prompt is the frozen rulebook (Phase 3.75 path 1) so vLLM's prefix cache stays warm across all turns regardless of band
+- `utils/llm.py`: `LLMResponse.first_token_entropy` field; vLLM (`SamplingParams.logprobs`) and transformers (`output_scores`) backends both populate it
+- `memory_source` per turn now reflects what the router actually picked (`msa`, `msa_vbus`, `msa_vbus_rag`) — drops in directly to the dashboard's modality breakdown
+- Probe tokens + latency are added to the turn metric so cumulative cost isn't undercounted
+- Ablation knob: `ROUTER_ENABLED=False` in `configs/settings.py` forces full memory injection (equivalent to a stacked Phase 3.5+3.75 baseline)
+
 ### ✅ NovaCorp Audit Simulator
 
 - 6 task templates covering 5 audit task types: audit, security, compliance, patch, analysis
@@ -681,31 +718,20 @@ python frontend/app.py
 3. Ablate path 1 vs path 2 by toggling `MSA_INJECT_FULL_RULEBOOK` / `MSA_INJECT_ROUTED_CHUNKS`
 4. Compare cumulative token cost and SOP-ordering errors against Baseline / RAG / Visual Bus on the same task set
 
-### Then: Phase 3.5 — Visual Bus + RAG combined ✅ BUILT
+### Then: Run the Tri-Mem benchmark on GPU
 
-1. `VisualBusRAGAgent` built in `agents/visual_bus_rag_agent.py`
-2. Summary-guided RAG: entities extracted from OCR summary → targeted lookups via `RAGStore.query_multi()`
-3. Action outcome tracking: success/failure stored in RAG so agent recalls "X failed at turn N"
-4. Run `python run_benchmark.py --agent visual_bus_rag --tasks 5` and compare against Visual Bus and RAG alone
-5. Key measurement: does targeted RAG reduce spatial hallucinations and syntactic errors vs. Phase 3?
+1. `python run_benchmark.py --agent trimem --tasks 5` on the Colab A100 / GPU box
+2. Verify the probe pass shows up as a separate `[LLM] Generating …` line with `H=…` reported
+3. Inspect `memory_source` distribution in the resulting log — should split across `msa` / `msa_vbus` / `msa_vbus_rag` instead of pinning to one band
+4. Compare cumulative token cost and SOP-ordering errors against Baseline / RAG / Visual Bus / VBus+RAG / MSA on the same task set
+5. Ablate the router: set `ROUTER_ENABLED=False` and rerun to confirm the routed agent beats the always-on-everything stacked baseline
 
-### Resolved Visual Bus Issues
+### Resolved Issues
 
-- **Spatial hallucinations** — ✅ Fixed. Failed observations are now rendered in yellow with "OBS FAILED" labels in the visual timeline (`memory/visual_bus.py`), so OCR preserves the failure signal instead of blurring it into success.
-- **CoT leakage into actions** — ✅ Fixed. `BaseAgent.parse_action()` now handles orphaned reasoning (truncated `<think>` blocks) by extracting the last embedded command verb from the reasoning text.
-- **Loop detection / recovery** — ✅ Fixed. `BaseAgent` now includes a repeat guard (same action 3+ times) and failure-rate guard (last 5 all failed), injecting explicit warnings into the agent's prompt.
-
-### Remaining Issues
-
-- **Entropy score wired but inert** — all turns report `entropy_score = -1.0`. Needs real logit-derived entropy before Phase 4 routing can use it.
-
-### Then: Phase 4 — Entropy Router
-
-1. Capture token-level log probabilities from model responses
-2. Compute Shannon Entropy per generation step
-3. Build threshold-based router (configurable in `configs/settings.py`)
-4. Create `TriMemAgent` that dynamically selects memory modality
-5. Key measurement: does automated routing match or exceed manually optimized baselines?
+- **Spatial hallucinations** — ✅ Fixed. Failed observations are rendered in yellow with "OBS FAILED" labels in the visual timeline (`memory/visual_bus.py`), so OCR preserves the failure signal instead of blurring it into success.
+- **CoT leakage into actions** — ✅ Fixed. `BaseAgent.parse_action()` handles orphaned reasoning (truncated `<think>` blocks) by extracting the last embedded command verb from the reasoning text.
+- **Loop detection / recovery** — ✅ Fixed. `BaseAgent` includes a repeat guard (same action 3+ times) and failure-rate guard (last 5 all failed), injecting explicit warnings into the agent's prompt.
+- **Entropy score wired but inert** — ✅ Fixed for the Tri-Mem agent. `LLMResponse.first_token_entropy` is populated from real top-K logprobs (vLLM `SamplingParams.logprobs` / transformers `output_scores`), and `TurnMetric.entropy_score` carries the probe's first-token Shannon entropy. Other agents still report `-1.0` (they don't run a probe).
 
 ### Then: Phase 5 — Dashboard Enhancements
 
@@ -736,8 +762,9 @@ python frontend/app.py
 ## Key Design Decisions
 
 - **AuditSim is drop-in replaceable.** The `NovaCorpAuditSim` class implements `reset()` → initial briefing and `step(action)` → (observation, done, success). Any environment matching this interface can be swapped in — originally specced against ALFWorld, now replaced by the custom NovaCorp IT procurement audit because it exercises all three memory layers (MSA + Visual Bus + RAG) instead of just two.
-- **Agents are modular.** Every agent extends `BaseAgent` with `reset(goal)` and `act(observation, turn) → (action, TurnMetric)`. Adding a new agent variant means one new file in [agents/](agents/). Five variants exist today: [baseline_agent.py](agents/baseline_agent.py), [rag_agent.py](agents/rag_agent.py), [visual_bus_agent.py](agents/visual_bus_agent.py), [visual_bus_rag_agent.py](agents/visual_bus_rag_agent.py), [msa_agent.py](agents/msa_agent.py).
-- **Metrics are phase-agnostic.** `TurnMetric` already has fields for `memory_source` and `entropy_score` even though Phase 1–3 don't emit real entropy values (all runs currently record `-1.0`). No schema changes will be needed when the Phase 4 entropy router lands.
+- **Agents are modular.** Every agent extends `BaseAgent` with `reset(goal)` and `act(observation, turn) → (action, TurnMetric)`. Adding a new agent variant means one new file in [agents/](agents/). Six variants exist today: [baseline_agent.py](agents/baseline_agent.py), [rag_agent.py](agents/rag_agent.py), [visual_bus_agent.py](agents/visual_bus_agent.py), [visual_bus_rag_agent.py](agents/visual_bus_rag_agent.py), [msa_agent.py](agents/msa_agent.py), [trimem_agent.py](agents/trimem_agent.py).
+- **Metrics are phase-agnostic.** `TurnMetric` carries `memory_source` and `entropy_score` for every agent. The Tri-Mem agent populates real logit-derived entropy via the probe pass; older single-modality agents still report `-1.0` (they don't run a probe), and `memory_source` distinguishes them anyway.
+- **The router is pure.** `router/entropy.py` does no I/O — it only maps a scalar entropy to a `RouteDecision`. Probing and memory assembly live in the agent. That keeps the router trivially testable and makes it cheap to swap in a calibrated entropy source later (e.g. Bayesian Teaching).
 - **Strict SOP ordering in the benchmark.** The audit simulator distinguishes three failure modes (`Access denied…`, `Command executed but returned no results…`, `Syntax error…`) so that metrics can attribute failures to the *right* memory layer — prerequisite violations stress episodic memory, wrong targets stress fact retrieval, syntax errors stress the action extractor.
 - **Frontend is framework-free.** Pure HTML/CSS/JS, no build step, no node_modules. Opens directly in a browser. Connects to Flask API when available, works standalone with sample data.
 - **Config is centralized.** All thresholds, model settings, and feature flags in `configs/settings.py`.
