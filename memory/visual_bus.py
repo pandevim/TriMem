@@ -186,7 +186,7 @@ class VisualBus:
             self._ocr_processor = AutoProcessor.from_pretrained(OCR_MODEL_NAME)
             self._ocr_model = AutoModelForImageTextToText.from_pretrained(
                 OCR_MODEL_NAME,
-                torch_dtype=torch.float16,
+                torch_dtype=torch.bfloat16,
                 device_map="auto",
             )
             self._ocr_model.eval()
