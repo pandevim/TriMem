@@ -90,7 +90,7 @@ def route(
         return RouteDecision(
             entropy=entropy,
             band=BAND_LOW,
-            use_msa_routed_chunks=False,
+            use_msa_routed_chunks=True,
             use_visual_bus=False,
             use_rag=False,
             reason=f"H={entropy:.3f} < {low} → MSA-only (frozen rulebook)",

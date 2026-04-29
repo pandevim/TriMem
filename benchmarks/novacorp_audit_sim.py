@@ -75,6 +75,26 @@ TASK_TEMPLATES = [
             "access compliance_dashboard", "query compliance_dashboard", "upload expense_report_1 to compliance_dashboard",
         ],
     },
+    # Repeat-SOP variant. The first 5 steps are the standard patch deployment
+    # (mirrors `patch_vulnerability`); the last 2 repeat `access <server>` +
+    # `run patch_script_1` against a second host. Designed to drive the probe
+    # entropy below ENTROPY_LOW_THRESHOLD on turns 5–6 so the LOW band
+    # actually fires — without one of these, the router operates as a binary
+    # MED/HIGH switch on this benchmark.
+    {
+        "id": "patch_two_servers",
+        "type": "patch",
+        "goal": "Download the patch script and apply it to both the main and backup servers.",
+        "solution_steps": [
+            "access code_repo",
+            "query code_repo",
+            "download patch_script_1 from code_repo",
+            "access main_server",
+            "run patch_script_1",
+            "access backup_server",
+            "run patch_script_1",
+        ],
+    },
 ]
 
 
