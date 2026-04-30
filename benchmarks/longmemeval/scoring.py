@@ -33,11 +33,45 @@ def _normalize(text: str) -> str:
     return text
 
 
+# Strips upstream's "(... ) is also acceptable" qualifier so the surrounding
+# alternate answer can be split out as its own candidate.
+_ACCEPTABLE_PHRASE = re.compile(
+    r"\s*\([^)]*\)\s*is also acceptable\.?", flags=re.IGNORECASE
+)
+
+
+def _candidate_answers(gold: str) -> list[str]:
+    """Extract acceptable answer candidates from a LongMemEval gold string.
+
+    Upstream often writes gold like ``"7 days. 8 days (including the last
+    day) is also acceptable."`` — both forms should match. We split on
+    sentence/list boundaries, drop the qualifier phrase, and normalize.
+    """
+    cleaned = _ACCEPTABLE_PHRASE.sub("", gold).strip()
+    parts = re.split(r"\s+or\s+|;|\.\s+", cleaned)
+    cands: list[str] = []
+    for part in parts:
+        p = part.strip().rstrip(".,").strip()
+        if not p:
+            continue
+        norm = _normalize(p)
+        if norm and norm not in cands:
+            cands.append(norm)
+    full = _normalize(gold.rstrip(".,"))
+    if full and full not in cands:
+        cands.append(full)
+    return cands
+
+
 def score_exact_substring(prediction: str, gold: str) -> ScoreResult:
-    p, g = _normalize(prediction), _normalize(gold)
-    if not g:
+    p = _normalize(prediction)
+    cands = _candidate_answers(gold)
+    if not cands:
         return ScoreResult(False, "exact_substring", "empty gold answer")
-    return ScoreResult(g in p, "exact_substring")
+    for c in cands:
+        if c in p:
+            return ScoreResult(True, "exact_substring", f"matched '{c}'")
+    return ScoreResult(False, "exact_substring")
 
 
 def score_llm_judge(prediction: str, gold: str, question: str) -> ScoreResult:

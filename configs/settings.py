@@ -4,7 +4,7 @@
 # Change MODEL_NAME to any HuggingFace model ID to swap models.
 MODEL_NAME = "Qwen/Qwen3.5-35B-A3B"
 INFERENCE_BACKEND = "vllm"  # "vllm" (fast, GPU) or "transformers" (universal fallback)
-MAX_TOKENS = 1024
+MAX_TOKENS = 2048
 # vLLM-specific settings
 GPU_MEMORY_UTILIZATION = 0.90
 MAX_MODEL_LEN = 16384
