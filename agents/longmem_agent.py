@@ -39,10 +39,14 @@ from memory.visual_bus import VisualBus
 from router.entropy import route, RouteDecision
 from utils.llm import get_llm
 from configs.settings import (
+    ENABLE_THINKING_MODE,
     MSA_TOP_K,
     ROUTER_ENABLED,
     ROUTER_PROBE_TOP_K,
 )
+
+
+_CHAT_TEMPLATE_KWARGS = {"enable_thinking": ENABLE_THINKING_MODE}
 
 
 _SYSTEM_PROMPT = """\
@@ -219,6 +223,7 @@ class LongMemAgent:
             max_tokens=1,
             temperature=0.0,
             logprobs=ROUTER_PROBE_TOP_K,
+            chat_template_kwargs=_CHAT_TEMPLATE_KWARGS,
         )
         return resp.first_token_entropy
 
@@ -334,5 +339,6 @@ class LongMemAgent:
         resp = self.llm.chat(
             system=_SYSTEM_PROMPT,
             messages=[{"role": "user", "content": user_msg}],
+            chat_template_kwargs=_CHAT_TEMPLATE_KWARGS,
         )
         return _strip_think(resp.text)

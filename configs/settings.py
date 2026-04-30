@@ -17,6 +17,16 @@ VLLM_MAX_NUM_SEQS = 16
 # --- Agent ---
 MAX_AGENT_TURNS = 60
 AGENT_TEMPERATURE = 0.2
+# Qwen3.x thinking-mode toggle. False = no <think> block, no "Thinking
+# Process:" preamble; the model goes straight to the answer. Affects
+# every chat() call that doesn't override chat_template_kwargs.
+ENABLE_THINKING_MODE = False
+
+# --- LLM judge (LongMemEval scoring) ---
+# Temperature for the judge call. Keep at 0 for determinism — the judge
+# emits a single yes/no token.
+JUDGE_TEMPERATURE = 0.0
+JUDGE_MAX_TOKENS = 8
 
 # --- Benchmark ---
 DEFAULT_NUM_TASKS = 10

@@ -125,6 +125,7 @@ class VLLMBackend:
         max_tokens: int = MAX_TOKENS,
         temperature: float = AGENT_TEMPERATURE,
         logprobs: int = 0,
+        chat_template_kwargs: dict | None = None,
     ) -> LLMResponse:
         from vllm import SamplingParams
 
@@ -137,7 +138,10 @@ class VLLMBackend:
         n_msgs = len(full_messages)
         print(f"[LLM] Generating (vLLM, {n_msgs} messages) …", end=" ", flush=True)
         t0 = time.time()
-        outputs = self.llm.chat(full_messages, sampling_params=sampling)
+        chat_kwargs = {"sampling_params": sampling}
+        if chat_template_kwargs:
+            chat_kwargs["chat_template_kwargs"] = chat_template_kwargs
+        outputs = self.llm.chat(full_messages, **chat_kwargs)
         latency = (time.time() - t0) * 1000
 
         out = outputs[0]
@@ -191,13 +195,18 @@ class TransformersBackend:
         max_tokens: int = MAX_TOKENS,
         temperature: float = AGENT_TEMPERATURE,
         logprobs: int = 0,
+        chat_template_kwargs: dict | None = None,
     ) -> LLMResponse:
         import torch
 
         full_messages = [{"role": "system", "content": system}] + messages
 
+        tmpl_kwargs = dict(chat_template_kwargs or {})
         prompt_text = self.tokenizer.apply_chat_template(
-            full_messages, tokenize=False, add_generation_prompt=True
+            full_messages,
+            tokenize=False,
+            add_generation_prompt=True,
+            **tmpl_kwargs,
         )
         inputs = self.tokenizer(prompt_text, return_tensors="pt").to(self.model.device)
         tokens_in = inputs["input_ids"].shape[1]
