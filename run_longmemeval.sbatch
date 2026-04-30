@@ -35,6 +35,10 @@ module load python/3.11.10
 # Other 12.x toolkits available: cuda12.{0,1,2,4}/toolkit/... — pick one that
 # matches the torch wheel index below (cu128 ↔ 12.8, cu124 ↔ 12.4, etc.).
 module load cuda12.8/toolkit/12.8.1
+# `pip install git+https://...` for transformers (GLM-OCR's processor only
+# lives on main, not a PyPI release yet) needs git on PATH. Adjust if
+# `module avail git` shows a different name.
+module load git || { echo "ERROR: no git module — run 'module avail git' to find one"; exit 1; }
 
 # Make CUDA_HOME explicit even if the module didn't set it. nvcc lives
 # at $CUDA_HOME/bin/nvcc, so derive it from `which nvcc`.
@@ -66,14 +70,14 @@ pip install --quiet --upgrade pip
 # resolve to a *prebuilt* nightly wheel for that exact torch instead of
 # falling back to a source build (which needs nvcc + CUDA_HOME and is
 # slow). Match the cu* index to the CUDA module loaded above.
-pip install --quiet torch --index-url https://download.pytorch.org/whl/cu128
+pip install torch --index-url https://download.pytorch.org/whl/cu128
 
 # vLLM nightly tracks the latest CUDA+torch combos and is needed for
 # Mamba/MoE support (Qwen3.5-35B-A3B). Bleeding-edge transformers is
 # required because GLM-OCR's processor lives on main (not yet released).
-pip install --quiet -U vllm --extra-index-url https://wheels.vllm.ai/nightly
-pip install --quiet chromadb "git+https://github.com/huggingface/transformers.git"
-pip install --quiet -U huggingface_hub
+pip install -U vllm --extra-index-url https://wheels.vllm.ai/nightly
+pip install chromadb "git+https://github.com/huggingface/transformers.git"
+pip install -U huggingface_hub
 
 # --- FlashAttention-2 ---
 # H100 (sm_90) supports both FA2 and FA3. We use the same prebuilt FA2
@@ -85,7 +89,7 @@ TORCH_V=$(python -c 'import torch; v=torch.__version__.split("+")[0].split(".");
 CUDA_V=$(python -c 'import torch; print(torch.version.cuda.replace(".",""))')
 FA_WHEEL="https://github.com/mjun0812/flash-attention-prebuild-wheels/releases/download/v0.9.0/flash_attn-2.8.3+cu${CUDA_V}torch${TORCH_V}-cp${PY_V}-cp${PY_V}-linux_x86_64.whl"
 echo "Trying FA2 wheel: $FA_WHEEL"
-pip install --quiet "$FA_WHEEL" || \
+pip install "$FA_WHEEL" || \
     echo "WARN: FA2 wheel install failed (cu${CUDA_V}/torch${TORCH_V}/cp${PY_V}) — vLLM will fall back to SDPA"
 
 # --- HF auth (Qwen + GLM-OCR + dataset) ---
