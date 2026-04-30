@@ -35,10 +35,9 @@ module load python/3.11.10
 # Other 12.x toolkits available: cuda12.{0,1,2,4}/toolkit/... — pick one that
 # matches the torch wheel index below (cu128 ↔ 12.8, cu124 ↔ 12.4, etc.).
 module load cuda12.8/toolkit/12.8.1
-# `pip install git+https://...` for transformers (GLM-OCR's processor only
-# lives on main, not a PyPI release yet) needs git on PATH. Adjust if
-# `module avail git` shows a different name.
-module load git || { echo "ERROR: no git module — run 'module avail git' to find one"; exit 1; }
+# Git is not available as a module on this cluster. We will bypass the need
+# for it by using ZIP downloads for pip installations.
+# module load git || { echo "ERROR: no git module — run 'module avail git' to find one"; exit 1; }
 
 # Make CUDA_HOME explicit even if the module didn't set it. nvcc lives
 # at $CUDA_HOME/bin/nvcc, so derive it from `which nvcc`.
@@ -75,8 +74,10 @@ pip install torch --index-url https://download.pytorch.org/whl/cu128
 # vLLM nightly tracks the latest CUDA+torch combos and is needed for
 # Mamba/MoE support (Qwen3.5-35B-A3B). Bleeding-edge transformers is
 # required because GLM-OCR's processor lives on main (not yet released).
+# Bleeding-edge transformers is required because GLM-OCR's processor lives 
+# on main. We use the .zip URL to bypass the need for a local 'git' binary.
 pip install -U vllm --extra-index-url https://wheels.vllm.ai/nightly
-pip install chromadb "git+https://github.com/huggingface/transformers.git"
+pip install chromadb "https://github.com/huggingface/transformers/archive/refs/heads/main.zip"
 pip install -U huggingface_hub
 
 # --- FlashAttention-2 ---
@@ -93,7 +94,7 @@ pip install "$FA_WHEEL" || \
     echo "WARN: FA2 wheel install failed (cu${CUDA_V}/torch${TORCH_V}/cp${PY_V}) — vLLM will fall back to SDPA"
 
 # --- HF auth (Qwen + GLM-OCR + dataset) ---
-huggingface-cli login --token "$HF_TOKEN" --add-to-git-credential || true
+huggingface-cli login --token "$HF_TOKEN"
 
 # --- vLLM + telemetry env (mirrors runner.ipynb) ---
 export VLLM_WORKER_MULTIPROC_METHOD=spawn
