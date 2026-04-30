@@ -20,12 +20,31 @@ mkdir -p logs
 #   sbatch run_longmemeval.sbatch
 : "${HF_TOKEN:?HF_TOKEN not set — export before sbatch}"
 
-# --- Python module ---
+# --- Python + CUDA modules ---
 # runner.ipynb runs on cp312, but the cluster only exposes 3.11.10. The
 # FA2 auto-detect below resolves the cp311 wheel; vLLM nightly publishes
 # both cp311 and cp312 builds.
+#
+# CUDA module is required: vLLM nightly falls back to a source build if
+# no prebuilt wheel matches the resolved torch/CUDA/python triple, and
+# the source build needs nvcc + CUDA_HOME. Adjust the cuda/* version to
+# whatever your cluster exposes (`module avail cuda`).
 module purge
 module load python/3.11.10
+# Cluster modulefile is nested: `cuda12.8/toolkit/12.8.1` (see `module avail cuda`).
+# Other 12.x toolkits available: cuda12.{0,1,2,4}/toolkit/... — pick one that
+# matches the torch wheel index below (cu128 ↔ 12.8, cu124 ↔ 12.4, etc.).
+module load cuda12.8/toolkit/12.8.1
+
+# Make CUDA_HOME explicit even if the module didn't set it. nvcc lives
+# at $CUDA_HOME/bin/nvcc, so derive it from `which nvcc`.
+if [ -z "${CUDA_HOME:-}" ]; then
+    NVCC_BIN=$(which nvcc 2>/dev/null || true)
+    if [ -n "$NVCC_BIN" ]; then
+        export CUDA_HOME=$(dirname "$(dirname "$NVCC_BIN")")
+    fi
+fi
+echo "CUDA_HOME=${CUDA_HOME:-<unset>}"
 
 # Module sets PYTHONHOME, which conflicts with the venv. Drop it.
 unset PYTHONHOME
@@ -43,6 +62,12 @@ source venv/bin/activate
 pip install --quiet --upgrade pip
 
 # --- Tri-Mem dependencies (mirrors runner.ipynb cell-6) ---
+# Install torch first with a pinned CUDA wheel index — this lets vLLM
+# resolve to a *prebuilt* nightly wheel for that exact torch instead of
+# falling back to a source build (which needs nvcc + CUDA_HOME and is
+# slow). Match the cu* index to the CUDA module loaded above.
+pip install --quiet torch --index-url https://download.pytorch.org/whl/cu128
+
 # vLLM nightly tracks the latest CUDA+torch combos and is needed for
 # Mamba/MoE support (Qwen3.5-35B-A3B). Bleeding-edge transformers is
 # required because GLM-OCR's processor lives on main (not yet released).
