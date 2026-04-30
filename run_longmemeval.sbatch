@@ -94,7 +94,7 @@ pip install "$FA_WHEEL" || \
     echo "WARN: FA2 wheel install failed (cu${CUDA_V}/torch${TORCH_V}/cp${PY_V}) — vLLM will fall back to SDPA"
 
 # --- HF auth (Qwen + GLM-OCR + dataset) ---
-huggingface-cli login --token "$HF_TOKEN"
+hf auth login --token "$HF_TOKEN"
 
 # --- vLLM + telemetry env (mirrors runner.ipynb) ---
 export VLLM_WORKER_MULTIPROC_METHOD=spawn
