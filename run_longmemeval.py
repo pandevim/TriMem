@@ -10,6 +10,12 @@ Download the dataset from:
 """
 from __future__ import annotations
 
+# --- SQLITE PATCH (Must be before other imports) ---
+__import__('pysqlite3')
+import sys
+sys.modules['sqlite3'] = sys.modules.pop('pysqlite3')
+# ---------------------------------------------------
+
 import argparse
 import json
 import os

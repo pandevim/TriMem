@@ -64,6 +64,9 @@ source venv/bin/activate
 
 pip install --quiet --upgrade pip
 
+# INSTALL SQLITE3 BINARY PATCH HERE:
+pip install pysqlite3-binary
+
 # --- Tri-Mem dependencies (mirrors runner.ipynb cell-6) ---
 # Install torch first with a pinned CUDA wheel index — this lets vLLM
 # resolve to a *prebuilt* nightly wheel for that exact torch instead of
