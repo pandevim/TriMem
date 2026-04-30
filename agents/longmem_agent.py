@@ -30,6 +30,7 @@ left for a follow-up so we can ship the harness end-to-end first.
 """
 from __future__ import annotations
 
+import os
 import re
 
 from memory.rag_store import RAGStore
@@ -86,6 +87,11 @@ class LongMemAgent:
         self.session_msa: SessionMSA | None = None
         self._visual_history: list[dict] = []
         self._ingested = False
+        # Retained only for LONGMEM_DEBUG=1 introspection. Negligible
+        # memory cost (a few KB of strings per task) and unused otherwise.
+        self._debug_session_ids: list[str] = []
+        self._debug_dates: list[str] = []
+        self._debug_session_texts: list[str] = []
 
     # ------------------------------------------------------------------
     # Lifecycle
@@ -99,6 +105,9 @@ class LongMemAgent:
         self.visual_bus.reset("longmem")
         self._visual_history = []
         self._ingested = False
+        self._debug_session_ids = []
+        self._debug_dates = []
+        self._debug_session_texts = []
 
     # ------------------------------------------------------------------
     # Ingest
@@ -115,6 +124,14 @@ class LongMemAgent:
 
         # SessionMSA — one chunk per session, embedded for Top-k routing.
         self.session_msa.ingest_sessions(sessions, session_ids, dates)
+
+        if os.environ.get("LONGMEM_DEBUG"):
+            self._debug_session_ids = list(session_ids)
+            self._debug_dates = list(dates)
+            self._debug_session_texts = [
+                self._render_session(s, d, sid)
+                for s, d, sid in zip(sessions, dates, session_ids)
+            ]
 
         # RAG — store each session as a fact so the high-entropy band
         # can pull verbatim text. Also store individual high-signal turns
@@ -216,12 +233,16 @@ class LongMemAgent:
         question_date: str,
     ) -> list[str]:
         blocks: list[str] = []
+        debug = bool(os.environ.get("LONGMEM_DEBUG"))
 
         if decision.use_msa_routed_chunks and self.session_msa is not None:
             chunks = self.session_msa.query(question, top_k=MSA_TOP_K)
             routed = SessionMSA.format_chunks(chunks)
             if routed:
                 blocks.append(routed)
+            if debug:
+                routed_ids = [c.session_id for c in chunks]
+                print(f"[DEBUG] MSA routed (top_k={MSA_TOP_K}): {routed_ids}", flush=True)
 
         if decision.use_visual_bus and self._visual_history:
             compressed = self.visual_bus.compress(self._visual_history)
@@ -246,6 +267,13 @@ class LongMemAgent:
                 blocks.append(
                     "[EXACT FACTS]\n" + "\n".join(f"- {f}" for f in facts)
                 )
+            if debug:
+                print(
+                    f"[DEBUG] RAG queries={queries[:5]}{'...' if len(queries) > 5 else ''}",
+                    flush=True,
+                )
+                for i, f in enumerate(facts[:5] if facts else []):
+                    print(f"[DEBUG] RAG fact[{i}]: {f[:200]!r}", flush=True)
 
         return blocks
 
@@ -263,6 +291,39 @@ class LongMemAgent:
             entropy = -1.0  # forces full injection
 
         decision = route(entropy)
+
+        if os.environ.get("LONGMEM_DEBUG"):
+            print(f"[DEBUG] question: {question!r}", flush=True)
+            print(f"[DEBUG] question_date: {question_date!r}", flush=True)
+            print(
+                f"[DEBUG] entropy={entropy:.4f}  decision="
+                f"msa={decision.use_msa_routed_chunks} "
+                f"vbus={decision.use_visual_bus} "
+                f"rag={decision.use_rag}",
+                flush=True,
+            )
+            print(
+                f"[DEBUG] haystack ({len(self._debug_session_ids)} sessions): "
+                f"{list(zip(self._debug_session_ids, self._debug_dates))}",
+                flush=True,
+            )
+            grep = os.environ.get("LONGMEM_DEBUG_GREP", "").strip()
+            if grep:
+                needles = [n.strip().lower() for n in grep.split(",") if n.strip()]
+                hits = []
+                for sid, date, text in zip(
+                    self._debug_session_ids,
+                    self._debug_dates,
+                    self._debug_session_texts,
+                ):
+                    lt = text.lower()
+                    if any(n in lt for n in needles):
+                        hits.append((sid, date))
+                print(
+                    f"[DEBUG] grep {needles!r} matched {len(hits)} sessions: {hits}",
+                    flush=True,
+                )
+
         blocks = self._build_memory_blocks(decision, question, question_date)
 
         date_line = f"Today's date: {question_date}\n" if question_date else ""
