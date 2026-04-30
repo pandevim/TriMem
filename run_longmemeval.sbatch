@@ -5,7 +5,7 @@
 #SBATCH --ntasks=1
 #SBATCH --gpus=1
 #SBATCH --cpus-per-task=8
-#SBATCH --mem=64G
+#SBATCH --mem=80G
 #SBATCH --time=04:00:00
 #SBATCH --output=logs/longmemeval_%j.out
 #SBATCH --error=logs/longmemeval_%j.err
@@ -21,21 +21,22 @@ mkdir -p logs
 : "${HF_TOKEN:?HF_TOKEN not set — export before sbatch}"
 
 # --- Python module ---
-# runner.ipynb runs on cp312 with the prebuilt FA2 wheel for cu128/torch2.10.
-# Adjust the module name to whatever your cluster exposes.
+# runner.ipynb runs on cp312, but the cluster only exposes 3.11.10. The
+# FA2 auto-detect below resolves the cp311 wheel; vLLM nightly publishes
+# both cp311 and cp312 builds.
 module purge
-module load python/3.12
+module load python/3.11.10
 
 # Module sets PYTHONHOME, which conflicts with the venv. Drop it.
 unset PYTHONHOME
 
 # --- Virtualenv ---
 # Recreate venv if it was built with a different interpreter.
-if [ -d "venv" ] && ! venv/bin/python -c 'import sys; assert sys.version_info[:2]==(3,12)' 2>/dev/null; then
+if [ -d "venv" ] && ! venv/bin/python -c 'import sys; assert sys.version_info[:2]==(3,11)' 2>/dev/null; then
     rm -rf venv
 fi
 if [ ! -d "venv" ]; then
-    python3.12 -m venv venv
+    python3.11 -m venv venv
 fi
 source venv/bin/activate
 
