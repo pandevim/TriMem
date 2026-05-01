@@ -21,6 +21,7 @@ import textwrap
 import time
 
 from configs.settings import (
+    OCR_DEVICE,
     OCR_MODEL_NAME,
     VISUAL_BUS_HISTORY_DIR,
     VISUAL_BUS_IMAGE_WIDTH,
@@ -181,13 +182,34 @@ class VisualBus:
             import torch
             from transformers import AutoProcessor, AutoModelForImageTextToText
 
-            print(f"[VisualBus] Loading OCR model ({OCR_MODEL_NAME}) …", flush=True)
+            # Pin OCR to OCR_DEVICE if it exists; otherwise let accelerate
+            # pick (single-GPU host, or device index out of range).
+            device_map: object = "auto"
+            chosen_device = "auto"
+            if isinstance(OCR_DEVICE, str) and OCR_DEVICE.startswith("cuda:"):
+                idx = int(OCR_DEVICE.split(":", 1)[1])
+                if idx < torch.cuda.device_count():
+                    device_map = {"": OCR_DEVICE}
+                    chosen_device = OCR_DEVICE
+                else:
+                    print(
+                        f"[VisualBus] OCR_DEVICE={OCR_DEVICE!r} not available "
+                        f"(only {torch.cuda.device_count()} GPUs visible); "
+                        f"falling back to device_map='auto'.",
+                        flush=True,
+                    )
+
+            print(
+                f"[VisualBus] Loading OCR model ({OCR_MODEL_NAME}) on "
+                f"{chosen_device} …",
+                flush=True,
+            )
             t0 = time.time()
             self._ocr_processor = AutoProcessor.from_pretrained(OCR_MODEL_NAME)
             self._ocr_model = AutoModelForImageTextToText.from_pretrained(
                 OCR_MODEL_NAME,
                 torch_dtype=torch.bfloat16,
-                device_map="auto",
+                device_map=device_map,
             )
             self._ocr_model.eval()
             print(f"[VisualBus] OCR model ready in {time.time() - t0:.1f}s", flush=True)

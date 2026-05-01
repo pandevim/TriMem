@@ -61,6 +61,11 @@ VISUAL_BUS_HISTORY_DIR = "/tmp/trimem_visual_bus"
 VISUAL_BUS_IMAGE_WIDTH = 1200     # pixel width of rendered history image
 VISUAL_BUS_FONT_SIZE = 14         # pt — monospace font size in rendered image
 MAX_VISUAL_TILES = 4              # max turns to keep in the visual history image
+# Device pin for GLM-OCR. With 2 GPUs allocated (sbatch --gpus=2), vLLM
+# owns cuda:0 (0.90 reservation) and OCR gets cuda:1 with all 94 GB to
+# itself. memory/visual_bus.py auto-falls back to device_map="auto" if
+# the requested device index doesn't exist (e.g. single-GPU host).
+OCR_DEVICE = "cuda:1"
 
 # --- Entropy Router (Phase 4) ---
 # Thresholds are measured in bits of Shannon entropy on the first

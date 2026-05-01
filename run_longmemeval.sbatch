@@ -3,9 +3,15 @@
 #SBATCH --partition=gpu-h100
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
-#SBATCH --gpus=1
-#SBATCH --cpus-per-task=8
-#SBATCH --mem=80G
+# Two H100 NVL GPUs (94 GB each). vLLM holds GPU 0 at GPU_MEMORY_UTILIZATION=0.90
+# (Qwen3.5-A3B + KV cache observed at ~82/94 GB on the single-GPU run, leaving
+# only ~10 GB for OCR co-tenant — tight). GLM-OCR is now pinned to GPU 1 via
+# OCR_DEVICE in configs/settings.py, freeing the full 94 GB on that card and
+# unlocking room to bump MAX_VISUAL_TILES later for the s_cleaned / m_cleaned
+# splits.
+#SBATCH --gpus=2
+#SBATCH --cpus-per-task=16
+#SBATCH --mem=120G
 #SBATCH --time=04:00:00
 #SBATCH --output=logs/longmemeval_%j.out
 #SBATCH --error=logs/longmemeval_%j.err
