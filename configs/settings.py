@@ -4,10 +4,24 @@
 # Change MODEL_NAME to any HuggingFace model ID to swap models.
 MODEL_NAME = "Qwen/Qwen3.5-35B-A3B"
 INFERENCE_BACKEND = "vllm"  # "vllm" (fast, GPU) or "transformers" (universal fallback)
-MAX_TOKENS = 2048
+# Generation cap. 2048 was hitting the ceiling on 3 of 5 early tasks once
+# Visual Bus was active (thinking-mode preamble + answer). 4096 leaves
+# clear headroom for the verbose CoT pass without forcing truncation.
+MAX_TOKENS = 4096
 # vLLM-specific settings
-GPU_MEMORY_UTILIZATION = 0.90
-MAX_MODEL_LEN = 16384
+# Bumped 0.90 → 0.95 once OCR moved off this card to cuda:1 (OCR_DEVICE
+# below). Single-GPU baseline kept the extra 10% as a co-tenancy buffer
+# for OCR; with vLLM alone on GPU 0 that buffer is just unused. The +5pp
+# (~4.7 GB on a 94 GB H100 NVL) gives KV cache room to actually exploit
+# the bumped MAX_MODEL_LEN=32768 on multi-session questions.
+GPU_MEMORY_UTILIZATION = 0.95
+# Total context budget (prompt + generation). With Visual Bus active the
+# assembled prompt routinely hits ~14k tokens; old 16384 cap left only
+# ~2400 for generation. 32768 gives ~18k of headroom for the answer
+# pass — enough for full thinking-mode reasoning on multi-session
+# questions. KV-cache cost is ~3 GB extra on GPU 0, well inside the
+# 0.90 reservation.
+MAX_MODEL_LEN = 32768
 # Max concurrent sequences vLLM will schedule. We run one task at a time so a
 # small number is fine; 256 (vLLM's default) is way too many for Mamba/MoE
 # models like Qwen3.5-35B-A3B where each decode seq needs a dedicated Mamba
