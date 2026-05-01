@@ -113,7 +113,11 @@ def run_eval(
 
         try:
             score: ScoreResult = score_prediction(
-                prediction, task.answer, question=task.question, method=method
+                prediction,
+                task.answer,
+                question=task.question,
+                question_type=task.question_type,
+                method=method,
             )
             correct = score.correct
         except Exception as e:

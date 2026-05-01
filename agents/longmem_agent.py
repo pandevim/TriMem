@@ -39,8 +39,16 @@ from memory.visual_bus import VisualBus
 from router.entropy import route, RouteDecision
 from utils.llm import get_llm
 from configs.settings import (
+    AGENT_PRESENCE_PENALTY,
+    AGENT_TEMPERATURE,
+    AGENT_TOP_K,
+    AGENT_TOP_P,
     ENABLE_THINKING_ANSWER,
     ENABLE_THINKING_PROBE,
+    EXTRACTION_ENABLED,
+    EXTRACTION_MAX_TOKENS,
+    EXTRACTION_MIN_CHARS,
+    EXTRACTION_TEMPERATURE,
     MSA_TOP_K,
     ROUTER_ENABLED,
     ROUTER_PROBE_TOP_K,
@@ -49,6 +57,34 @@ from configs.settings import (
 
 _PROBE_TEMPLATE_KWARGS = {"enable_thinking": ENABLE_THINKING_PROBE}
 _ANSWER_TEMPLATE_KWARGS = {"enable_thinking": ENABLE_THINKING_ANSWER}
+_EXTRACTOR_TEMPLATE_KWARGS = {"enable_thinking": False}
+
+
+_EXTRACTOR_SYSTEM = """\
+You are an answer extractor. Given a verbose response from a memory-QA
+assistant — possibly containing chain-of-thought, "Thinking Process:"
+preamble, or analysis — distill the FINAL answer to the user's question.
+
+Rules:
+- Output the final answer only, in <=20 words. No preamble, no
+  explanation, no markdown.
+- For factual questions, give just the fact (e.g. "Tomatoes",
+  "Samsung Galaxy S22", "14 days", "GPS system issue").
+- For recommendation questions, give the concrete recommendation in
+  one or two short lines (e.g. "Sony 55mm lens, Zhiyun gimbal").
+- If the verbose response never reaches a clear conclusion, output
+  exactly: I don't know.
+- Trust the verbose response — do not invent facts not present in it.
+"""
+
+
+_EXTRACTOR_USER_TMPL = """\
+Question: {question}
+
+Verbose response:
+{response}
+
+Final answer:"""
 
 
 _SYSTEM_PROMPT = """\
@@ -342,5 +378,51 @@ class LongMemAgent:
             system=_SYSTEM_PROMPT,
             messages=[{"role": "user", "content": user_msg}],
             chat_template_kwargs=_ANSWER_TEMPLATE_KWARGS,
+            temperature=AGENT_TEMPERATURE,
+            top_p=AGENT_TOP_P,
+            top_k=AGENT_TOP_K,
+            presence_penalty=AGENT_PRESENCE_PENALTY,
         )
-        return _strip_think(resp.text)
+        raw = _strip_think(resp.text)
+        return self._maybe_extract(question, raw)
+
+    # ------------------------------------------------------------------
+    # Answer extraction (verbose-CoT safety net)
+    # ------------------------------------------------------------------
+
+    def _maybe_extract(self, question: str, raw_answer: str) -> str:
+        """Distill verbose CoT responses to a clean answer line.
+
+        Skipped when the raw answer is already concise. The extractor is
+        a small thinking-off LLM call; on average it adds <0.5 s but
+        rescues cases where the model burned its token budget on
+        chain-of-thought and never committed to a final answer (the
+        "Five months ago" failure pattern at 4096-token truncation).
+        """
+        if not EXTRACTION_ENABLED:
+            return raw_answer
+        if not raw_answer or len(raw_answer) < EXTRACTION_MIN_CHARS:
+            return raw_answer
+        # Strong heuristic: if the raw text begins with a bullet number /
+        # "Thinking" / "1." / "Step", a final committed answer probably
+        # isn't on the first line. Always extract.
+        # (We could be smarter, but extraction is cheap.)
+        user = _EXTRACTOR_USER_TMPL.format(
+            question=question.strip() or "(no question provided)",
+            response=raw_answer.strip(),
+        )
+        try:
+            resp = self.llm.chat(
+                system=_EXTRACTOR_SYSTEM,
+                messages=[{"role": "user", "content": user}],
+                max_tokens=EXTRACTION_MAX_TOKENS,
+                temperature=EXTRACTION_TEMPERATURE,
+                chat_template_kwargs=_EXTRACTOR_TEMPLATE_KWARGS,
+            )
+        except Exception as e:
+            print(f"[LongMemAgent] extractor failed ({e}); using raw answer.", flush=True)
+            return raw_answer
+        clean = _strip_think(resp.text).strip()
+        if not clean:
+            return raw_answer
+        return clean

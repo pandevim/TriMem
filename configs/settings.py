@@ -2,7 +2,12 @@
 
 # --- LLM ---
 # Change MODEL_NAME to any HuggingFace model ID to swap models.
-MODEL_NAME = "Qwen/Qwen3.5-35B-A3B"
+# Qwen3.6-35B-A3B: drop-in successor to 3.5-35B-A3B. Same 35B/3B-active MoE
+# (256 experts, 8 routed + 1 shared), 262k native context, properly tagged
+# <think>...</think> thinking output (our _strip_think handles it),
+# improved on every benchmark we care about (GPQA 84.2 → 86.0,
+# LiveCodeBench 74.6 → 80.4, agentic tasks +5–11pp).
+MODEL_NAME = "Qwen/Qwen3.6-35B-A3B"
 INFERENCE_BACKEND = "vllm"  # "vllm" (fast, GPU) or "transformers" (universal fallback)
 # Generation cap. 2048 was hitting the ceiling on 3 of 5 early tasks once
 # Visual Bus was active (thinking-mode preamble + answer). 4096 leaves
@@ -15,13 +20,14 @@ MAX_TOKENS = 4096
 # (~4.7 GB on a 94 GB H100 NVL) gives KV cache room to actually exploit
 # the bumped MAX_MODEL_LEN=32768 on multi-session questions.
 GPU_MEMORY_UTILIZATION = 0.95
-# Total context budget (prompt + generation). With Visual Bus active the
-# assembled prompt routinely hits ~14k tokens; old 16384 cap left only
-# ~2400 for generation. 32768 gives ~18k of headroom for the answer
-# pass — enough for full thinking-mode reasoning on multi-session
-# questions. KV-cache cost is ~3 GB extra on GPU 0, well inside the
-# 0.90 reservation.
-MAX_MODEL_LEN = 32768
+# Total context budget (prompt + generation). On the s_cleaned split each
+# task carries ~50 sessions in its haystack; assembled prompts (MSA top-k +
+# Visual Bus + RAG) can push to ~30–40k tokens, so 32768 is no longer enough.
+# 65536 covers s_cleaned with margin and stays well within Qwen3.6's
+# 262k native context. KV-cache impact is small because Qwen3.6's hidden
+# layout is 75% Gated DeltaNet (linear, no KV cache) and only 25% Gated
+# Attention — net additional KV cost vs 32k ≈ 1.3 GB.
+MAX_MODEL_LEN = 65536
 # Max concurrent sequences vLLM will schedule. We run one task at a time so a
 # small number is fine; 256 (vLLM's default) is way too many for Mamba/MoE
 # models like Qwen3.5-35B-A3B where each decode seq needs a dedicated Mamba
@@ -30,7 +36,15 @@ VLLM_MAX_NUM_SEQS = 16
 
 # --- Agent ---
 MAX_AGENT_TURNS = 60
-AGENT_TEMPERATURE = 0.2
+# Qwen3.6 recommended sampling for thinking-mode general tasks:
+#   temperature=1.0, top_p=0.95, top_k=20, presence_penalty=1.5
+# We deviate slightly: lower temperature for benchmark determinism but
+# keep the rest. The presence penalty matters — without it Qwen3 thinking
+# tends to loop on its own previous reasoning steps.
+AGENT_TEMPERATURE = 0.7
+AGENT_TOP_P = 0.95
+AGENT_TOP_K = 20
+AGENT_PRESENCE_PENALTY = 1.5
 # Qwen3.x thinking-mode toggle, set per call site. Empirically:
 #   - Probe pass: OFF — entropy reading must be on the answer-token
 #     distribution, not on a <think> opening token.
@@ -47,6 +61,19 @@ ENABLE_THINKING_JUDGE = False
 # emits a single yes/no token.
 JUDGE_TEMPERATURE = 0.0
 JUDGE_MAX_TOKENS = 8
+
+# --- Answer extraction (verbose-CoT safety net) ---
+# After the agent's main answer pass we run a small thinking-off
+# extraction call to distill the verbose <think>-tagged response (or
+# any "Thinking Process:" prose preamble that leaks through) down to a
+# clean, judge-friendly answer line. Skip if the raw answer is already
+# concise (saves the extra ~0.3s).
+EXTRACTION_ENABLED = True
+EXTRACTION_MAX_TOKENS = 96
+EXTRACTION_TEMPERATURE = 0.0
+# Below this character length the answer is considered already concise
+# and the extraction call is skipped.
+EXTRACTION_MIN_CHARS = 240
 
 # --- Benchmark ---
 DEFAULT_NUM_TASKS = 10

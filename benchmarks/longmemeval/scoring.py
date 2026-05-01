@@ -123,6 +123,76 @@ Predicted answer: {prediction}
 Verdict (yes or no):"""
 
 
+# --- Rubric judge (single-session-preference) ----------------------------
+# Preference questions in LongMemEval don't have factual gold answers —
+# they have *rubrics* describing what the user "would prefer" to receive.
+# A factual-match judge fails on these even when the prediction is great
+# (we measured 6.7% on n=30 with the strict judge). The rubric judge
+# instead compares the recommendation against the preference criteria.
+_RUBRIC_JUDGE_SYSTEM = """\
+You are grading recommendations against a user-preference rubric for a
+long-term-memory QA benchmark.
+
+The gold answer is NOT a single factual target — it is a rubric describing
+what the user "would prefer" to receive (and sometimes what they "would
+not prefer"). Your job is to decide whether the predicted recommendation
+satisfies that rubric.
+
+Rules:
+- "yes" if the prediction's recommendation aligns with the user's stated
+  preferences in the rubric (compatible brand, topic, style, or features
+  the rubric calls out).
+- "yes" if the prediction names specific items consistent with the
+  rubric's "would prefer" criteria, even if not every detail is covered.
+- "no" if the prediction recommends something the rubric explicitly says
+  the user "would not prefer", contradicts the user's known interests,
+  or fails to make a recommendation at all (e.g. "I don't know").
+- "no" if the prediction is purely a chain-of-thought with no concrete
+  recommendation. Look at the *bottom-line recommendation*, ignoring
+  preamble and "Thinking Process" text.
+- Partial alignment counts as yes when the rubric is broad; only mark no
+  when the recommendation clearly misses or contradicts the rubric.
+
+Output: a single token, either "yes" or "no". No punctuation, no
+explanation, no other text.
+"""
+
+
+_RUBRIC_JUDGE_USER_TMPL = """\
+Question: {question}
+
+Preference rubric (what the user would / would not prefer):
+{gold}
+
+Predicted recommendation:
+{prediction}
+
+Does the prediction align with the preference rubric? (yes or no):"""
+
+
+# Categories whose gold answers are rubrics, not factual targets. Anything
+# not in this set uses the strict factual judge.
+_RUBRIC_CATEGORIES = frozenset({"single-session-preference"})
+
+
+def _judge_call(system: str, user: str) -> tuple[bool | None, str]:
+    """Run the judge LLM and return (verdict, raw_text)."""
+    from configs.settings import (
+        ENABLE_THINKING_JUDGE,
+        JUDGE_MAX_TOKENS,
+        JUDGE_TEMPERATURE,
+    )
+
+    resp = _get_judge_llm().chat(
+        system=system,
+        messages=[{"role": "user", "content": user}],
+        max_tokens=JUDGE_MAX_TOKENS,
+        temperature=JUDGE_TEMPERATURE,
+        chat_template_kwargs={"enable_thinking": ENABLE_THINKING_JUDGE},
+    )
+    return _parse_verdict(resp.text), resp.text
+
+
 # Lazy-init: the judge shares the agent's vLLM singleton, so the model
 # is loaded exactly once per process.
 _judge_llm = None
@@ -152,51 +222,53 @@ def _parse_verdict(text: str) -> bool | None:
     return None
 
 
-def score_llm_judge(prediction, gold, question) -> ScoreResult:
-    """Judge by yes/no verdict from the same LLM the agent uses.
+def score_llm_judge(prediction, gold, question, question_type: str = "") -> ScoreResult:
+    """Judge by yes/no verdict, dispatching on question_type.
 
-    Accepts non-str inputs (some LongMemEval gold answers are ints) and
-    coerces them via ``_coerce`` so direct callers — not just the
-    public ``score_prediction`` entry — are crash-safe.
+    Most LongMemEval categories use the strict factual-match judge. The
+    ``single-session-preference`` category gets a rubric-matching judge
+    because its gold strings are preference rubrics, not factual targets
+    (a strict judge scores ~6.7% on n=30; rubric judge recovers most of
+    those). Accepts non-str inputs (some golds are ints).
     """
-    from configs.settings import (
-        ENABLE_THINKING_JUDGE,
-        JUDGE_MAX_TOKENS,
-        JUDGE_TEMPERATURE,
-    )
-
     prediction = _coerce(prediction)
     gold = _coerce(gold)
     question = _coerce(question)
+    question_type = _coerce(question_type)
 
     if not gold.strip():
         return ScoreResult(False, "llm_judge", "empty gold answer")
     if not prediction.strip():
         return ScoreResult(False, "llm_judge", "empty prediction")
 
-    user = _JUDGE_USER_TMPL.format(
-        question=question.strip() or "(no question provided)",
-        gold=gold.strip(),
-        prediction=prediction.strip(),
-    )
-    resp = _get_judge_llm().chat(
-        system=_JUDGE_SYSTEM,
-        messages=[{"role": "user", "content": user}],
-        max_tokens=JUDGE_MAX_TOKENS,
-        temperature=JUDGE_TEMPERATURE,
-        chat_template_kwargs={"enable_thinking": ENABLE_THINKING_JUDGE},
-    )
-    verdict = _parse_verdict(resp.text)
+    if question_type in _RUBRIC_CATEGORIES:
+        system = _RUBRIC_JUDGE_SYSTEM
+        user = _RUBRIC_JUDGE_USER_TMPL.format(
+            question=question.strip() or "(no question provided)",
+            gold=gold.strip(),
+            prediction=prediction.strip(),
+        )
+        method_label = "llm_judge_rubric"
+    else:
+        system = _JUDGE_SYSTEM
+        user = _JUDGE_USER_TMPL.format(
+            question=question.strip() or "(no question provided)",
+            gold=gold.strip(),
+            prediction=prediction.strip(),
+        )
+        method_label = "llm_judge"
+
+    verdict, raw = _judge_call(system, user)
     if verdict is None:
         # Unparseable verdict — fall back to exact_substring so we don't
         # silently mark every borderline case correct or incorrect.
         sub = score_exact_substring(prediction, gold)
         return ScoreResult(
             sub.correct,
-            "llm_judge",
-            f"unparseable judge output {resp.text!r}; fell back to exact_substring",
+            method_label,
+            f"unparseable judge output {raw!r}; fell back to exact_substring",
         )
-    return ScoreResult(verdict, "llm_judge", f"judge said {resp.text.strip()!r}")
+    return ScoreResult(verdict, method_label, f"judge said {raw.strip()!r}")
 
 
 def score_prediction(
@@ -204,13 +276,15 @@ def score_prediction(
     gold,
     *,
     question: str = "",
+    question_type: str = "",
     method: str = "exact_substring",
 ) -> ScoreResult:
     prediction = _coerce(prediction)
     gold = _coerce(gold)
     question = _coerce(question)
+    question_type = _coerce(question_type)
     if method == "exact_substring":
         return score_exact_substring(prediction, gold)
     if method == "llm_judge":
-        return score_llm_judge(prediction, gold, question)
+        return score_llm_judge(prediction, gold, question, question_type)
     raise ValueError(f"Unknown scoring method: {method}")

@@ -126,15 +126,25 @@ class VLLMBackend:
         temperature: float = AGENT_TEMPERATURE,
         logprobs: int = 0,
         chat_template_kwargs: dict | None = None,
+        top_p: float | None = None,
+        top_k: int | None = None,
+        presence_penalty: float | None = None,
     ) -> LLMResponse:
         from vllm import SamplingParams
 
         full_messages = [{"role": "system", "content": system}] + messages
-        sampling = SamplingParams(
-            temperature=temperature,
-            max_tokens=max_tokens,
-            logprobs=logprobs if logprobs > 0 else None,
-        )
+        sp_kwargs = {
+            "temperature": temperature,
+            "max_tokens": max_tokens,
+            "logprobs": logprobs if logprobs > 0 else None,
+        }
+        if top_p is not None:
+            sp_kwargs["top_p"] = top_p
+        if top_k is not None:
+            sp_kwargs["top_k"] = top_k
+        if presence_penalty is not None:
+            sp_kwargs["presence_penalty"] = presence_penalty
+        sampling = SamplingParams(**sp_kwargs)
         n_msgs = len(full_messages)
         print(f"[LLM] Generating (vLLM, {n_msgs} messages) …", end=" ", flush=True)
         t0 = time.time()

@@ -133,9 +133,18 @@ mkdir -p "$HF_HOME"
 # --- LongMemEval data ---
 # Three splits ship at huggingface.co/datasets/xiaowu0162/longmemeval-cleaned:
 #   longmemeval_oracle.json    — only evidence sessions (smallest, smoke runs)
-#   longmemeval_s_cleaned.json — small haystack (~50 sessions / task)
+#   longmemeval_s_cleaned.json — small haystack (~50 sessions / task) — paper headline
 #   longmemeval_m_cleaned.json — medium haystack
-# Default to oracle; override with DATA_FILE env var.
+# Default to oracle for fast smoke runs; for the paper run both splits:
+#
+#   # 1) Oracle (already done; keep as upper-bound number)
+#   MAX_TASKS=all METHOD=llm_judge \
+#     OUTPUT=logs/longmemeval_oracle_paper.json sbatch run_longmemeval.sbatch
+#
+#   # 2) S-split (the canonical LongMemEval evaluation)
+#   DATA_FILE=./data/longmemeval/longmemeval_s_cleaned.json \
+#     MAX_TASKS=all METHOD=llm_judge \
+#     OUTPUT=logs/longmemeval_s_paper.json sbatch run_longmemeval.sbatch
 DATA_DIR=${DATA_DIR:-./data/longmemeval}
 DATA_FILE=${DATA_FILE:-$DATA_DIR/longmemeval_oracle.json}
 mkdir -p "$DATA_DIR"
