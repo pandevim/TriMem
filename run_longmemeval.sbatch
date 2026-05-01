@@ -55,6 +55,19 @@ if [ -z "${CUDA_HOME:-}" ]; then
 fi
 echo "CUDA_HOME=${CUDA_HOME:-<unset>}"
 
+# --- GPU allocation sanity check ---
+# Slurm sets CUDA_VISIBLE_DEVICES based on --gpus=N. We need both GPUs
+# visible: vLLM picks cuda:0, OCR is pinned to cuda:1 (configs/settings.py).
+# If the partition denied the second GPU and gave us only one, fail
+# fast here instead of OOMing during OCR load 30 minutes in.
+echo "CUDA_VISIBLE_DEVICES=${CUDA_VISIBLE_DEVICES:-<unset>}"
+nvidia-smi --query-gpu=index,name,memory.total --format=csv,noheader || true
+GPU_COUNT=$(nvidia-smi --query-gpu=index --format=csv,noheader | wc -l)
+if [ "${GPU_COUNT}" -lt 2 ]; then
+    echo "WARN: only ${GPU_COUNT} GPU(s) visible — OCR will fall back to" \
+         "device_map='auto' and contend with vLLM on GPU 0. Expected 2."
+fi
+
 # Module sets PYTHONHOME, which conflicts with the venv. Drop it.
 unset PYTHONHOME
 

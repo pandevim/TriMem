@@ -71,6 +71,11 @@ MAX_VISUAL_TILES = 16             # max turns to keep in the visual history imag
 # itself. memory/visual_bus.py auto-falls back to device_map="auto" if
 # the requested device index doesn't exist (e.g. single-GPU host).
 OCR_DEVICE = "cuda:1"
+# OCR generate token cap. Scales with input image height: at MAX_VISUAL_TILES=4
+# and ~150 px/tile, 8192 was sufficient. After bumping tiles to 16 the rendered
+# image is ~4× taller and OCR output text grows with it; a hard 8192 cap risks
+# silent truncation of the compressed history. 16384 leaves margin.
+OCR_MAX_NEW_TOKENS = 16384
 
 # --- Entropy Router (Phase 4) ---
 # Thresholds are measured in bits of Shannon entropy on the first

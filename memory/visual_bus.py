@@ -22,6 +22,7 @@ import time
 
 from configs.settings import (
     OCR_DEVICE,
+    OCR_MAX_NEW_TOKENS,
     OCR_MODEL_NAME,
     VISUAL_BUS_HISTORY_DIR,
     VISUAL_BUS_IMAGE_WIDTH,
@@ -248,7 +249,9 @@ class VisualBus:
         inputs.pop("token_type_ids", None)
 
         with torch.no_grad():
-            generated_ids = self._ocr_model.generate(**inputs, max_new_tokens=8192)
+            generated_ids = self._ocr_model.generate(
+                **inputs, max_new_tokens=OCR_MAX_NEW_TOKENS
+            )
 
         output_text = self._ocr_processor.decode(
             generated_ids[0][inputs["input_ids"].shape[1]:],
