@@ -140,7 +140,7 @@ def _parse_verdict(text: str) -> bool | None:
 def score_llm_judge(prediction: str, gold: str, question: str) -> ScoreResult:
     """Judge by yes/no verdict from the same LLM the agent uses."""
     from configs.settings import (
-        ENABLE_THINKING_MODE,
+        ENABLE_THINKING_JUDGE,
         JUDGE_MAX_TOKENS,
         JUDGE_TEMPERATURE,
     )
@@ -160,7 +160,7 @@ def score_llm_judge(prediction: str, gold: str, question: str) -> ScoreResult:
         messages=[{"role": "user", "content": user}],
         max_tokens=JUDGE_MAX_TOKENS,
         temperature=JUDGE_TEMPERATURE,
-        chat_template_kwargs={"enable_thinking": ENABLE_THINKING_MODE},
+        chat_template_kwargs={"enable_thinking": ENABLE_THINKING_JUDGE},
     )
     verdict = _parse_verdict(resp.text)
     if verdict is None:

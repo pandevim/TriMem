@@ -1,0 +1,103 @@
+{
+  "agent": "trimem_longmem",
+  "method": "llm_judge",
+  "accuracy": 0.7,
+  "per_type": {
+    "temporal-reasoning": {
+      "n": 10,
+      "accuracy": 0.7
+    }
+  },
+  "outcomes": [
+    {
+      "question_id": "gpt4_2655b836",
+      "question_type": "temporal-reasoning",
+      "question": "What was the first issue I had with my new car after its first service?",
+      "gold": "GPS system not functioning correctly",
+      "prediction": "The first issue you had with your new car after its first service was a GPS system problem on March 22nd, which required the entire system to be replaced at the dealership.",
+      "correct": true,
+      "latency_s": 13.69469666481018
+    },
+    {
+      "question_id": "gpt4_2487a7cb",
+      "question_type": "temporal-reasoning",
+      "question": "Which event did I attend first, the 'Effective Time Management' workshop or the 'Data Analysis using Python' webinar?",
+      "gold": "'Data Analysis using Python' webinar",
+      "prediction": "The 'Data Analysis using Python' webinar.",
+      "correct": true,
+      "latency_s": 9.11988115310669
+    },
+    {
+      "question_id": "gpt4_76048e76",
+      "question_type": "temporal-reasoning",
+      "question": "Which vehicle did I take care of first in February, the bike or the car?",
+      "gold": "bike",
+      "prediction": "The bike",
+      "correct": true,
+      "latency_s": 6.218172311782837
+    },
+    {
+      "question_id": "gpt4_2312f94c",
+      "question_type": "temporal-reasoning",
+      "question": "Which device did I got first, the Samsung Galaxy S22 or the Dell XPS 13?",
+      "gold": "Samsung Galaxy S22",
+      "prediction": "Dell XPS 13",
+      "correct": false,
+      "latency_s": 5.301475524902344
+    },
+    {
+      "question_id": "0bb5a684",
+      "question_type": "temporal-reasoning",
+      "question": "How many days before the team meeting I was preparing for did I attend the workshop on 'Effective Communication in the Workplace'?",
+      "gold": "7 days. 8 days (including the last day) is also acceptable.",
+      "prediction": "7",
+      "correct": true,
+      "latency_s": 7.548099040985107
+    },
+    {
+      "question_id": "08f4fc43",
+      "question_type": "temporal-reasoning",
+      "question": "How many days had passed between the Sunday mass at St. Mary's Church and the Ash Wednesday service at the cathedral?",
+      "gold": "30 days. 31 days (including the last day) is also acceptable.",
+      "prediction": "30",
+      "correct": true,
+      "latency_s": 5.6851301193237305
+    },
+    {
+      "question_id": "2c63a862",
+      "question_type": "temporal-reasoning",
+      "question": "How many days did it take for me to find a house I loved after starting to work with Rachel?",
+      "gold": "14 days. 15 days (including the last day) is also acceptable.",
+      "prediction": "15",
+      "correct": true,
+      "latency_s": 7.474745035171509
+    },
+    {
+      "question_id": "gpt4_385a5000",
+      "question_type": "temporal-reasoning",
+      "question": "Which seeds were started first, the tomatoes or the marigolds?",
+      "gold": "Tomatoes",
+      "prediction": "The marigolds were started first.",
+      "correct": false,
+      "latency_s": 6.52227258682251
+    },
+    {
+      "question_id": "2a1811e2",
+      "question_type": "temporal-reasoning",
+      "question": "How many days had passed between the Hindu festival of Holi and the Sunday mass at St. Mary's Church?",
+      "gold": "21 days. 22 days (including the last day) is also acceptable.",
+      "prediction": "21",
+      "correct": true,
+      "latency_s": 6.088741779327393
+    },
+    {
+      "question_id": "bbf86515",
+      "question_type": "temporal-reasoning",
+      "question": "How many days before the 'Rack Fest' did I participate in the 'Turbocharged Tuesdays' event?",
+      "gold": "4 days.",
+      "prediction": "14",
+      "correct": false,
+      "latency_s": 8.012739419937134
+    }
+  ]
+}

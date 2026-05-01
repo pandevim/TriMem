@@ -17,10 +17,16 @@ VLLM_MAX_NUM_SEQS = 16
 # --- Agent ---
 MAX_AGENT_TURNS = 60
 AGENT_TEMPERATURE = 0.2
-# Qwen3.x thinking-mode toggle. False = no <think> block, no "Thinking
-# Process:" preamble; the model goes straight to the answer. Affects
-# every chat() call that doesn't override chat_template_kwargs.
-ENABLE_THINKING_MODE = False
+# Qwen3.x thinking-mode toggle, set per call site. Empirically:
+#   - Probe pass: OFF — entropy reading must be on the answer-token
+#     distribution, not on a <think> opening token.
+#   - Answer pass: ON — reasoning gives ~+30pp on temporal questions on
+#     the LongMemEval slice; the LLM judge already tolerates the verbose
+#     preamble so we don't pay a grading penalty.
+#   - Judge pass: OFF — single yes/no verdict; reasoning is wasteful.
+ENABLE_THINKING_PROBE = False
+ENABLE_THINKING_ANSWER = True
+ENABLE_THINKING_JUDGE = False
 
 # --- LLM judge (LongMemEval scoring) ---
 # Temperature for the judge call. Keep at 0 for determinism — the judge
