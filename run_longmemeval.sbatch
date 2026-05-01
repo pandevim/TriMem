@@ -82,6 +82,10 @@ pip install torch --index-url https://download.pytorch.org/whl/cu128
 pip install -U vllm --extra-index-url https://wheels.vllm.ai/nightly
 pip install chromadb "https://github.com/huggingface/transformers/archive/refs/heads/main.zip"
 pip install -U huggingface_hub
+# accelerate is required by transformers when loading models with
+# device_map="auto" (GLM-OCR in memory/visual_bus.py); without it OCR
+# silently falls back to truncated text and the Visual Bus layer is OFF.
+pip install accelerate
 
 # --- FlashAttention-2 ---
 # H100 (sm_90) supports both FA2 and FA3. We use the same prebuilt FA2
@@ -135,14 +139,21 @@ fi
 # --- Run ---
 # Override MAX_TASKS / METHOD / OUTPUT in the calling shell:
 #   MAX_TASKS=50 METHOD=exact_substring sbatch run_longmemeval.sbatch
+# Set MAX_TASKS=all (or empty / 0) to run the full split.
 MAX_TASKS=${MAX_TASKS:-10}
 METHOD=${METHOD:-exact_substring}
 OUTPUT=${OUTPUT:-logs/longmemeval_${SLURM_JOB_ID}.json}
 
+MAX_TASKS_ARG=()
+case "$MAX_TASKS" in
+    all|All|ALL|0|"") ;;  # no cap — omit the flag
+    *) MAX_TASKS_ARG=(--max-tasks "$MAX_TASKS") ;;
+esac
+
 python run_longmemeval.py \
     --data "$DATA_FILE" \
     --agent trimem \
-    --max-tasks "$MAX_TASKS" \
+    "${MAX_TASKS_ARG[@]}" \
     --method "$METHOD" \
     --output "$OUTPUT"
 
