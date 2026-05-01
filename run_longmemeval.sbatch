@@ -12,7 +12,7 @@
 #SBATCH --gpus=2
 #SBATCH --cpus-per-task=16
 #SBATCH --mem=120G
-#SBATCH --time=04:00:00
+#SBATCH --time=08:00:00
 #SBATCH --output=logs/longmemeval_%j.out
 #SBATCH --error=logs/longmemeval_%j.err
 
