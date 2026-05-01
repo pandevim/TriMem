@@ -14,9 +14,10 @@ plumbing for LongMemEval is hardened).
 """
 from __future__ import annotations
 
+import json
 import time
 from collections import defaultdict
-from dataclasses import dataclass, field
+from dataclasses import asdict, dataclass, field
 from typing import Protocol
 
 from benchmarks.longmemeval.loader import LongMemEvalTask
@@ -78,7 +79,14 @@ def run_eval(
     *,
     method: str = "exact_substring",
     verbose: bool = True,
+    snapshot_path: str | None = None,
 ) -> HarnessResult:
+    """Run the eval loop.
+
+    ``snapshot_path``: if set, write a partial-results JSON after every
+    task. Cheap (single-digit kB writes per task) and means a mid-run
+    crash leaves N-1 graded outcomes on disk instead of zero.
+    """
     result = HarnessResult(agent_name=agent.name, method=method)
 
     for i, task in enumerate(tasks, 1):
@@ -103,26 +111,55 @@ def run_eval(
             prediction = f"[agent error: {e}]"
         latency = time.time() - t0
 
-        score: ScoreResult = score_prediction(
-            prediction, task.answer, question=task.question, method=method
-        )
+        try:
+            score: ScoreResult = score_prediction(
+                prediction, task.answer, question=task.question, method=method
+            )
+            correct = score.correct
+        except Exception as e:
+            # Scoring failure shouldn't kill the whole run — record it as
+            # incorrect with the exception text and continue. Without this
+            # guard a single malformed gold answer ends 500-task jobs.
+            print(f"  [scoring error: {e}] — marking task incorrect", flush=True)
+            correct = False
+
         outcome = TaskOutcome(
             question_id=task.question_id,
             question_type=task.question_type,
             question=task.question,
-            gold=task.answer,
+            gold=str(task.answer),
             prediction=prediction,
-            correct=score.correct,
+            correct=correct,
             latency_s=latency,
         )
         result.outcomes.append(outcome)
 
         if verbose:
             mark = "✓" if outcome.correct else "✗"
+            gold_disp = str(task.answer)
             print(
-                f"  {mark} pred={prediction[:120]!r}  gold={task.answer[:80]!r}  "
+                f"  {mark} pred={prediction[:120]!r}  gold={gold_disp[:80]!r}  "
                 f"({latency:.1f}s)",
                 flush=True,
             )
 
+        if snapshot_path:
+            _write_snapshot(snapshot_path, result)
+
     return result
+
+
+def _write_snapshot(path: str, result: HarnessResult) -> None:
+    payload = {
+        "agent": result.agent_name,
+        "method": result.method,
+        "accuracy": result.accuracy,
+        "per_type": result.per_type(),
+        "outcomes": [asdict(o) for o in result.outcomes],
+        "_partial": True,
+    }
+    tmp = path + ".tmp"
+    with open(tmp, "w") as f:
+        json.dump(payload, f, indent=2)
+    import os
+    os.replace(tmp, path)

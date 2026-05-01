@@ -71,7 +71,16 @@ def main():
         return
 
     agent = make_agent(args.agent)
-    result = run_eval(agent, tasks, method=args.method, verbose=not args.quiet)
+    # Pass the output path as snapshot_path so partial results are written
+    # after each task — a mid-run crash leaves N-1 graded outcomes on disk
+    # instead of losing the entire job.
+    result = run_eval(
+        agent,
+        tasks,
+        method=args.method,
+        verbose=not args.quiet,
+        snapshot_path=args.output,
+    )
 
     print("\n" + "=" * 60)
     print(f"Agent: {result.agent_name}  Method: {result.method}")

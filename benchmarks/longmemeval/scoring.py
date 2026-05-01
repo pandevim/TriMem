@@ -28,7 +28,19 @@ class ScoreResult:
     rationale: str = ""
 
 
-def _normalize(text: str) -> str:
+def _coerce(x) -> str:
+    """LongMemEval gold answers are sometimes ints (count questions in the
+    multi-session category, e.g. "How many times did I…"). Coerce to str
+    once at every public entry point so downstream regex / .strip()
+    code never sees a non-string.
+    """
+    if x is None:
+        return ""
+    return x if isinstance(x, str) else str(x)
+
+
+def _normalize(text) -> str:
+    text = _coerce(text)
     text = text.lower().strip()
     text = re.sub(r"\s+", " ", text)
     text = re.sub(r"[\"'`]", "", text)
@@ -42,13 +54,16 @@ _ACCEPTABLE_PHRASE = re.compile(
 )
 
 
-def _candidate_answers(gold: str) -> list[str]:
+def _candidate_answers(gold) -> list[str]:
     """Extract acceptable answer candidates from a LongMemEval gold string.
 
     Upstream often writes gold like ``"7 days. 8 days (including the last
     day) is also acceptable."`` — both forms should match. We split on
     sentence/list boundaries, drop the qualifier phrase, and normalize.
+    Accepts non-str input (some multi-session golds are ints).
     """
+    if not isinstance(gold, str):
+        gold = "" if gold is None else str(gold)
     cleaned = _ACCEPTABLE_PHRASE.sub("", gold).strip()
     parts = re.split(r"\s+or\s+|;|\.\s+", cleaned)
     cands: list[str] = []
@@ -137,13 +152,22 @@ def _parse_verdict(text: str) -> bool | None:
     return None
 
 
-def score_llm_judge(prediction: str, gold: str, question: str) -> ScoreResult:
-    """Judge by yes/no verdict from the same LLM the agent uses."""
+def score_llm_judge(prediction, gold, question) -> ScoreResult:
+    """Judge by yes/no verdict from the same LLM the agent uses.
+
+    Accepts non-str inputs (some LongMemEval gold answers are ints) and
+    coerces them via ``_coerce`` so direct callers — not just the
+    public ``score_prediction`` entry — are crash-safe.
+    """
     from configs.settings import (
         ENABLE_THINKING_JUDGE,
         JUDGE_MAX_TOKENS,
         JUDGE_TEMPERATURE,
     )
+
+    prediction = _coerce(prediction)
+    gold = _coerce(gold)
+    question = _coerce(question)
 
     if not gold.strip():
         return ScoreResult(False, "llm_judge", "empty gold answer")
@@ -176,12 +200,15 @@ def score_llm_judge(prediction: str, gold: str, question: str) -> ScoreResult:
 
 
 def score_prediction(
-    prediction: str,
-    gold: str,
+    prediction,
+    gold,
     *,
     question: str = "",
     method: str = "exact_substring",
 ) -> ScoreResult:
+    prediction = _coerce(prediction)
+    gold = _coerce(gold)
+    question = _coerce(question)
     if method == "exact_substring":
         return score_exact_substring(prediction, gold)
     if method == "llm_judge":
