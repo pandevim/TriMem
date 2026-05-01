@@ -60,7 +60,12 @@ OCR_MODEL_NAME = "zai-org/GLM-OCR"
 VISUAL_BUS_HISTORY_DIR = "/tmp/trimem_visual_bus"
 VISUAL_BUS_IMAGE_WIDTH = 1200     # pixel width of rendered history image
 VISUAL_BUS_FONT_SIZE = 14         # pt — monospace font size in rendered image
-MAX_VISUAL_TILES = 4              # max turns to keep in the visual history image
+# Bumped 4 → 16 once OCR moved to its own GPU (cuda:1, OCR_DEVICE below).
+# At 4 we lost most session context on the s_cleaned split; at 16 we cover
+# oracle (2–3 sessions/task) with margin and capture the most recent 16
+# sessions on s_cleaned. Going higher pressures the OCR generate cap at
+# memory/visual_bus.py:229 (max_new_tokens=8192) without much added recall.
+MAX_VISUAL_TILES = 16             # max turns to keep in the visual history image
 # Device pin for GLM-OCR. With 2 GPUs allocated (sbatch --gpus=2), vLLM
 # owns cuda:0 (0.90 reservation) and OCR gets cuda:1 with all 94 GB to
 # itself. memory/visual_bus.py auto-falls back to device_map="auto" if
