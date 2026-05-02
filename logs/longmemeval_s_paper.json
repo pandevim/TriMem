@@ -1,0 +1,819 @@
+{
+  "agent": "trimem_longmem",
+  "method": "llm_judge",
+  "accuracy": 0.7865168539325843,
+  "per_type": {
+    "single-session-user": {
+      "n": 70,
+      "accuracy": 0.8142857142857143
+    },
+    "multi-session": {
+      "n": 19,
+      "accuracy": 0.6842105263157895
+    }
+  },
+  "outcomes": [
+    {
+      "question_id": "e47becba",
+      "question_type": "single-session-user",
+      "question": "What degree did I graduate with?",
+      "gold": "Business Administration",
+      "prediction": "Business Administration",
+      "correct": true,
+      "latency_s": 39.017664670944214
+    },
+    {
+      "question_id": "118b2229",
+      "question_type": "single-session-user",
+      "question": "How long is my daily commute to work?",
+      "gold": "45 minutes each way",
+      "prediction": "45 minutes each way",
+      "correct": true,
+      "latency_s": 29.909339904785156
+    },
+    {
+      "question_id": "51a45a95",
+      "question_type": "single-session-user",
+      "question": "Where did I redeem a $5 coupon on coffee creamer?",
+      "gold": "Target",
+      "prediction": "Target",
+      "correct": true,
+      "latency_s": 30.05743980407715
+    },
+    {
+      "question_id": "58bf7951",
+      "question_type": "single-session-user",
+      "question": "What play did I attend at the local community theater?",
+      "gold": "The Glass Menagerie",
+      "prediction": "I don't know.",
+      "correct": false,
+      "latency_s": 178.17957019805908
+    },
+    {
+      "question_id": "1e043500",
+      "question_type": "single-session-user",
+      "question": "What is the name of the playlist I created on Spotify?",
+      "gold": "Summer Vibes",
+      "prediction": "Summer Vibes",
+      "correct": true,
+      "latency_s": 28.254016399383545
+    },
+    {
+      "question_id": "c5e8278d",
+      "question_type": "single-session-user",
+      "question": "What was my last name before I changed it?",
+      "gold": "Johnson",
+      "prediction": "Johnson",
+      "correct": true,
+      "latency_s": 29.29862952232361
+    },
+    {
+      "question_id": "6ade9755",
+      "question_type": "single-session-user",
+      "question": "Where do I take yoga classes?",
+      "gold": "Serenity Yoga",
+      "prediction": "Serenity Yoga",
+      "correct": true,
+      "latency_s": 176.88958382606506
+    },
+    {
+      "question_id": "6f9b354f",
+      "question_type": "single-session-user",
+      "question": "What color did I repaint my bedroom walls?",
+      "gold": "a lighter shade of gray",
+      "prediction": "A lighter shade of gray",
+      "correct": true,
+      "latency_s": 28.44311237335205
+    },
+    {
+      "question_id": "58ef2f1c",
+      "question_type": "single-session-user",
+      "question": "When did I volunteer at the local animal shelter's fundraising dinner?",
+      "gold": "February 14th",
+      "prediction": "February",
+      "correct": false,
+      "latency_s": 182.04107785224915
+    },
+    {
+      "question_id": "f8c5f88b",
+      "question_type": "single-session-user",
+      "question": "Where did I buy my new tennis racket from?",
+      "gold": "the sports store downtown",
+      "prediction": "A sports store downtown",
+      "correct": true,
+      "latency_s": 29.106167793273926
+    },
+    {
+      "question_id": "5d3d2817",
+      "question_type": "single-session-user",
+      "question": "What was my previous occupation?",
+      "gold": "Marketing specialist at a small startup",
+      "prediction": "I don't know.",
+      "correct": false,
+      "latency_s": 182.75491309165955
+    },
+    {
+      "question_id": "7527f7e2",
+      "question_type": "single-session-user",
+      "question": "How much did I spend on a designer handbag?",
+      "gold": "$800",
+      "prediction": "$800",
+      "correct": true,
+      "latency_s": 26.675094604492188
+    },
+    {
+      "question_id": "c960da58",
+      "question_type": "single-session-user",
+      "question": "How many playlists do I have on Spotify?",
+      "gold": "20",
+      "prediction": "20",
+      "correct": true,
+      "latency_s": 28.096763610839844
+    },
+    {
+      "question_id": "3b6f954b",
+      "question_type": "single-session-user",
+      "question": "Where did I attend for my study abroad program?",
+      "gold": "University of Melbourne in Australia",
+      "prediction": "I don't know.",
+      "correct": false,
+      "latency_s": 32.325448989868164
+    },
+    {
+      "question_id": "726462e0",
+      "question_type": "single-session-user",
+      "question": "What was the discount I got on my first purchase from the new clothing brand?",
+      "gold": "10%",
+      "prediction": "I don't know.",
+      "correct": false,
+      "latency_s": 177.72882175445557
+    },
+    {
+      "question_id": "94f70d80",
+      "question_type": "single-session-user",
+      "question": "How long did it take me to assemble the IKEA bookshelf?",
+      "gold": "4 hours",
+      "prediction": "4 hours",
+      "correct": true,
+      "latency_s": 176.48578882217407
+    },
+    {
+      "question_id": "66f24dbb",
+      "question_type": "single-session-user",
+      "question": "What did I buy for my sister's birthday gift?",
+      "gold": "a yellow dress",
+      "prediction": "A yellow dress and a pair of matching earrings.",
+      "correct": true,
+      "latency_s": 28.87594771385193
+    },
+    {
+      "question_id": "ad7109d1",
+      "question_type": "single-session-user",
+      "question": "What speed is my new internet plan?",
+      "gold": "500 Mbps",
+      "prediction": "500 Mbps",
+      "correct": true,
+      "latency_s": 28.126017570495605
+    },
+    {
+      "question_id": "af8d2e46",
+      "question_type": "single-session-user",
+      "question": "How many shirts did I pack for my 5-day trip to Costa Rica?",
+      "gold": "7",
+      "prediction": "7",
+      "correct": true,
+      "latency_s": 30.329626321792603
+    },
+    {
+      "question_id": "dccbc061",
+      "question_type": "single-session-user",
+      "question": "What was my previous stance on spirituality?",
+      "gold": "A staunch atheist",
+      "prediction": "Staunch atheist",
+      "correct": true,
+      "latency_s": 28.40548825263977
+    },
+    {
+      "question_id": "c8c3f81d",
+      "question_type": "single-session-user",
+      "question": "What brand are my favorite running shoes?",
+      "gold": "Nike",
+      "prediction": "Nike",
+      "correct": true,
+      "latency_s": 28.485456943511963
+    },
+    {
+      "question_id": "8ebdbe50",
+      "question_type": "single-session-user",
+      "question": "What certification did I complete last month?",
+      "gold": "Data Science",
+      "prediction": "Data Science",
+      "correct": true,
+      "latency_s": 29.100239276885986
+    },
+    {
+      "question_id": "6b168ec8",
+      "question_type": "single-session-user",
+      "question": "How many bikes do I own?",
+      "gold": "three",
+      "prediction": "Three",
+      "correct": true,
+      "latency_s": 180.57056713104248
+    },
+    {
+      "question_id": "75499fd8",
+      "question_type": "single-session-user",
+      "question": "What breed is my dog?",
+      "gold": "Golden Retriever",
+      "prediction": "Golden Retriever",
+      "correct": true,
+      "latency_s": 177.93384504318237
+    },
+    {
+      "question_id": "21436231",
+      "question_type": "single-session-user",
+      "question": "How many largemouth bass did I catch on my fishing trip to Lake Michigan?",
+      "gold": "12",
+      "prediction": "12",
+      "correct": true,
+      "latency_s": 175.0496563911438
+    },
+    {
+      "question_id": "95bcc1c8",
+      "question_type": "single-session-user",
+      "question": "How many amateur comedians did I watch perform at the open mic night?",
+      "gold": "10",
+      "prediction": "10",
+      "correct": true,
+      "latency_s": 27.89776349067688
+    },
+    {
+      "question_id": "0862e8bf",
+      "question_type": "single-session-user",
+      "question": "What is the name of my cat?",
+      "gold": "Luna",
+      "prediction": "Luna",
+      "correct": true,
+      "latency_s": 176.6720142364502
+    },
+    {
+      "question_id": "853b0a1d",
+      "question_type": "single-session-user",
+      "question": "How old was I when my grandma gave me the silver necklace?",
+      "gold": "18",
+      "prediction": "18",
+      "correct": true,
+      "latency_s": 179.06816220283508
+    },
+    {
+      "question_id": "a06e4cfe",
+      "question_type": "single-session-user",
+      "question": "What is my preferred gin-to-vermouth ratio for a classic gin martini?",
+      "gold": "3:1",
+      "prediction": "3:1 ratio",
+      "correct": true,
+      "latency_s": 28.028438329696655
+    },
+    {
+      "question_id": "37d43f65",
+      "question_type": "single-session-user",
+      "question": "How much RAM did I upgrade my laptop to?",
+      "gold": "16GB",
+      "prediction": "16GB",
+      "correct": true,
+      "latency_s": 26.902592658996582
+    },
+    {
+      "question_id": "b86304ba",
+      "question_type": "single-session-user",
+      "question": "How much is the painting of a sunset worth in terms of the amount I paid for it?",
+      "gold": "The painting is worth triple what I paid for it.",
+      "prediction": "I don't know.",
+      "correct": false,
+      "latency_s": 175.06455397605896
+    },
+    {
+      "question_id": "d52b4f67",
+      "question_type": "single-session-user",
+      "question": "Where did I attend my cousin's wedding?",
+      "gold": "The Grand Ballroom",
+      "prediction": "Grand Ballroom",
+      "correct": true,
+      "latency_s": 26.015517473220825
+    },
+    {
+      "question_id": "25e5aa4f",
+      "question_type": "single-session-user",
+      "question": "Where did I complete my Bachelor's degree in Computer Science?",
+      "gold": "University of California, Los Angeles (UCLA)",
+      "prediction": "UCLA",
+      "correct": true,
+      "latency_s": 177.15492510795593
+    },
+    {
+      "question_id": "caf9ead2",
+      "question_type": "single-session-user",
+      "question": "How long did it take to move to the new apartment?",
+      "gold": "5 hours",
+      "prediction": "5 hours",
+      "correct": true,
+      "latency_s": 175.11158061027527
+    },
+    {
+      "question_id": "8550ddae",
+      "question_type": "single-session-user",
+      "question": "What type of cocktail recipe did I try last weekend?",
+      "gold": "lavender gin fizz",
+      "prediction": "Lavender Gin Fizz",
+      "correct": true,
+      "latency_s": 29.708826780319214
+    },
+    {
+      "question_id": "60d45044",
+      "question_type": "single-session-user",
+      "question": "What type of rice is my favorite?",
+      "gold": "Japanese short-grain rice",
+      "prediction": "Japanese short-grain rice",
+      "correct": true,
+      "latency_s": 178.9852261543274
+    },
+    {
+      "question_id": "3f1e9474",
+      "question_type": "single-session-user",
+      "question": "Who did I have a conversation with about destiny?",
+      "gold": "Sarah",
+      "prediction": "Sarah",
+      "correct": true,
+      "latency_s": 25.242909908294678
+    },
+    {
+      "question_id": "86b68151",
+      "question_type": "single-session-user",
+      "question": "Where did I buy my new bookshelf from?",
+      "gold": "IKEA",
+      "prediction": "IKEA",
+      "correct": true,
+      "latency_s": 31.36588478088379
+    },
+    {
+      "question_id": "577d4d32",
+      "question_type": "single-session-user",
+      "question": "What time do I stop checking work emails and messages?",
+      "gold": "7 pm",
+      "prediction": "7 pm",
+      "correct": true,
+      "latency_s": 176.6628816127777
+    },
+    {
+      "question_id": "ec81a493",
+      "question_type": "single-session-user",
+      "question": "How many copies of my favorite artist's debut album were released worldwide?",
+      "gold": "500",
+      "prediction": "500 copies",
+      "correct": true,
+      "latency_s": 25.91497254371643
+    },
+    {
+      "question_id": "15745da0",
+      "question_type": "single-session-user",
+      "question": "How long have I been collecting vintage cameras?",
+      "gold": "three months",
+      "prediction": "Three months",
+      "correct": true,
+      "latency_s": 25.5714213848114
+    },
+    {
+      "question_id": "e01b8e2f",
+      "question_type": "single-session-user",
+      "question": "Where did I go on a week-long trip with my family?",
+      "gold": "Hawaii",
+      "prediction": "Hawaii",
+      "correct": true,
+      "latency_s": 177.24244713783264
+    },
+    {
+      "question_id": "bc8a6e93",
+      "question_type": "single-session-user",
+      "question": "What did I bake for my niece's birthday party?",
+      "gold": "a lemon blueberry cake",
+      "prediction": "I don't know.",
+      "correct": false,
+      "latency_s": 176.84342741966248
+    },
+    {
+      "question_id": "ccb36322",
+      "question_type": "single-session-user",
+      "question": "What is the name of the music streaming service have I been using lately?",
+      "gold": "Spotify",
+      "prediction": "Spotify",
+      "correct": true,
+      "latency_s": 26.323027849197388
+    },
+    {
+      "question_id": "001be529",
+      "question_type": "single-session-user",
+      "question": "How long did I wait for the decision on my asylum application?",
+      "gold": "over a year",
+      "prediction": "Over a year",
+      "correct": true,
+      "latency_s": 29.059687614440918
+    },
+    {
+      "question_id": "b320f3f8",
+      "question_type": "single-session-user",
+      "question": "What type of action figure did I buy from a thrift store?",
+      "gold": "a blue Snaggletooth",
+      "prediction": "A rare blue Snaggletooth action figure",
+      "correct": true,
+      "latency_s": 26.127387046813965
+    },
+    {
+      "question_id": "19b5f2b3",
+      "question_type": "single-session-user",
+      "question": "How long was I in Japan for?",
+      "gold": "two weeks",
+      "prediction": "Two weeks",
+      "correct": true,
+      "latency_s": 176.74021577835083
+    },
+    {
+      "question_id": "4fd1909e",
+      "question_type": "single-session-user",
+      "question": "Where did I attend the Imagine Dragons concert?",
+      "gold": "Xfinity Center",
+      "prediction": "Xfinity Center",
+      "correct": true,
+      "latency_s": 176.19138169288635
+    },
+    {
+      "question_id": "545bd2b5",
+      "question_type": "single-session-user",
+      "question": "How much screen time have I been averaging on Instagram per day?",
+      "gold": "2 hours",
+      "prediction": "2 hours",
+      "correct": true,
+      "latency_s": 178.57904434204102
+    },
+    {
+      "question_id": "8a137a7f",
+      "question_type": "single-session-user",
+      "question": "What type of bulb did I replace in my bedside lamp?",
+      "gold": "Philips LED bulb",
+      "prediction": "Philips LED bulb",
+      "correct": true,
+      "latency_s": 28.382522583007812
+    },
+    {
+      "question_id": "76d63226",
+      "question_type": "single-session-user",
+      "question": "What size is my new Samsung TV?",
+      "gold": "55-inch",
+      "prediction": "55-inch",
+      "correct": true,
+      "latency_s": 177.60431957244873
+    },
+    {
+      "question_id": "86f00804",
+      "question_type": "single-session-user",
+      "question": "What book am I currently reading?",
+      "gold": "The Seven Husbands of Evelyn Hugo",
+      "prediction": "The Seven Husbands of Evelyn Hugo",
+      "correct": true,
+      "latency_s": 28.868295907974243
+    },
+    {
+      "question_id": "8e9d538c",
+      "question_type": "single-session-user",
+      "question": "How many skeins of worsted weight yarn did I find in my stash?",
+      "gold": "17",
+      "prediction": "17 skeins",
+      "correct": true,
+      "latency_s": 27.91107988357544
+    },
+    {
+      "question_id": "311778f1",
+      "question_type": "single-session-user",
+      "question": "How many hours did I spend watching documentaries on Netflix last month?",
+      "gold": "10",
+      "prediction": "10 hours",
+      "correct": true,
+      "latency_s": 178.018239736557
+    },
+    {
+      "question_id": "c19f7a0b",
+      "question_type": "single-session-user",
+      "question": "What time do I usually get home from work on weeknights?",
+      "gold": "6:30 pm",
+      "prediction": "6:30 pm",
+      "correct": true,
+      "latency_s": 28.908093690872192
+    },
+    {
+      "question_id": "4100d0a0",
+      "question_type": "single-session-user",
+      "question": "What is my ethnicity?",
+      "gold": "A mix of Irish and Italian",
+      "prediction": "Irish and Italian",
+      "correct": true,
+      "latency_s": 198.8208200931549
+    },
+    {
+      "question_id": "29f2956b",
+      "question_type": "single-session-user",
+      "question": "How much time do I dedicate to practicing guitar every day?",
+      "gold": "30 minutes",
+      "prediction": "30 minutes",
+      "correct": true,
+      "latency_s": 30.077932119369507
+    },
+    {
+      "question_id": "1faac195",
+      "question_type": "single-session-user",
+      "question": "Where does my sister Emily live?",
+      "gold": "Denver",
+      "prediction": "Denver",
+      "correct": true,
+      "latency_s": 178.41879725456238
+    },
+    {
+      "question_id": "faba32e5",
+      "question_type": "single-session-user",
+      "question": "How long did Alex marinate the BBQ ribs in special sauce?",
+      "gold": "24 hours",
+      "prediction": "24 hours",
+      "correct": true,
+      "latency_s": 30.790602922439575
+    },
+    {
+      "question_id": "f4f1d8a4",
+      "question_type": "single-session-user",
+      "question": "Who gave me a new stand mixer as a birthday gift?",
+      "gold": "my sister",
+      "prediction": "My sister",
+      "correct": true,
+      "latency_s": 175.77449321746826
+    },
+    {
+      "question_id": "c14c00dd",
+      "question_type": "single-session-user",
+      "question": "What brand of shampoo do I currently use?",
+      "gold": "Trader Joe's",
+      "prediction": "Trader Joe's",
+      "correct": true,
+      "latency_s": 32.37350368499756
+    },
+    {
+      "question_id": "36580ce8",
+      "question_type": "single-session-user",
+      "question": "What health issue did I initially think was just a cold?",
+      "gold": "bronchitis",
+      "prediction": "Bronchitis",
+      "correct": true,
+      "latency_s": 176.41935205459595
+    },
+    {
+      "question_id": "3d86fd0a",
+      "question_type": "single-session-user",
+      "question": "Where did I meet Sophia?",
+      "gold": "a coffee shop in the city",
+      "prediction": "A coffee shop in the city.",
+      "correct": true,
+      "latency_s": 29.002176523208618
+    },
+    {
+      "question_id": "a82c026e",
+      "question_type": "single-session-user",
+      "question": "What game did I finally beat last weekend?",
+      "gold": "Dark Souls 3 DLC",
+      "prediction": "Dark Souls 3 DLC",
+      "correct": true,
+      "latency_s": 177.6751070022583
+    },
+    {
+      "question_id": "0862e8bf_abs",
+      "question_type": "single-session-user",
+      "question": "What is the name of my hamster?",
+      "gold": "You did not mention this information. You mentioned your cat Luna but not your hamster.",
+      "prediction": "I don't know.",
+      "correct": false,
+      "latency_s": 27.90430521965027
+    },
+    {
+      "question_id": "15745da0_abs",
+      "question_type": "single-session-user",
+      "question": "How long have I been collecting vintage films?",
+      "gold": "You did not mention this information. You mentioned collecting vintage cameras but not vintage films.",
+      "prediction": "Three months",
+      "correct": false,
+      "latency_s": 177.31321930885315
+    },
+    {
+      "question_id": "bc8a6e93_abs",
+      "question_type": "single-session-user",
+      "question": "What did I bake for my uncle's birthday party?",
+      "gold": "You did not mention this information. You mentioned baking for your niece's birthday party but not your uncle's",
+      "prediction": "Lemon blueberry cake",
+      "correct": false,
+      "latency_s": 33.39648771286011
+    },
+    {
+      "question_id": "19b5f2b3_abs",
+      "question_type": "single-session-user",
+      "question": "How long was I in Korea for?",
+      "gold": "You did not mention this information. You mentioned staying in Japan, but not in Korea.",
+      "prediction": "I don't know.",
+      "correct": false,
+      "latency_s": 176.32490181922913
+    },
+    {
+      "question_id": "29f2956b_abs",
+      "question_type": "single-session-user",
+      "question": "How much time do I dedicate to practicing violin every day?",
+      "gold": "You did not mention this information. You mentioned practing guitar everyday, but not violin.",
+      "prediction": "I don't know.",
+      "correct": false,
+      "latency_s": 178.42720532417297
+    },
+    {
+      "question_id": "f4f1d8a4_abs",
+      "question_type": "single-session-user",
+      "question": "What did my dad gave me as a birthday gift?",
+      "gold": "You did not mention this information. You mentioned receiving a birthday gift from your sister, but not your dad.",
+      "prediction": "I don't know.",
+      "correct": false,
+      "latency_s": 27.33878517150879
+    },
+    {
+      "question_id": "0a995998",
+      "question_type": "multi-session",
+      "question": "How many items of clothing do I need to pick up or return from a store?",
+      "gold": "3",
+      "prediction": "3 items (a navy blue blazer, a pair of boots to return, and a pair of new boots to pick up)",
+      "correct": true,
+      "latency_s": 33.0636830329895
+    },
+    {
+      "question_id": "6d550036",
+      "question_type": "multi-session",
+      "question": "How many projects have I led or am currently leading?",
+      "gold": "2",
+      "prediction": "Two.",
+      "correct": true,
+      "latency_s": 33.908106327056885
+    },
+    {
+      "question_id": "gpt4_59c863d7",
+      "question_type": "multi-session",
+      "question": "How many model kits have I worked on or bought?",
+      "gold": "I have worked on or bought five model kits. The scales of the models are: Revell F-15 Eagle (scale not mentioned), Tamiya 1/48 scale Spitfire Mk.V, 1/16 scale German Tiger I tank, 1/72 scale B-29 bomber, and 1/24 scale '69 Camaro.",
+      "prediction": "5",
+      "correct": true,
+      "latency_s": 32.296687841415405
+    },
+    {
+      "question_id": "b5ef892d",
+      "question_type": "multi-session",
+      "question": "How many days did I spend on camping trips in the United States this year?",
+      "gold": "8 days.",
+      "prediction": "8 days",
+      "correct": true,
+      "latency_s": 31.0060875415802
+    },
+    {
+      "question_id": "e831120c",
+      "question_type": "multi-session",
+      "question": "How many weeks did it take me to watch all the Marvel Cinematic Universe movies and the main Star Wars films?",
+      "gold": "3.5 weeks",
+      "prediction": "3.5 weeks",
+      "correct": true,
+      "latency_s": 29.906938552856445
+    },
+    {
+      "question_id": "3a704032",
+      "question_type": "multi-session",
+      "question": "How many plants did I acquire in the last month?",
+      "gold": "3",
+      "prediction": "2",
+      "correct": false,
+      "latency_s": 29.701567888259888
+    },
+    {
+      "question_id": "gpt4_d84a3211",
+      "question_type": "multi-session",
+      "question": "How much total money have I spent on bike-related expenses since the start of the year?",
+      "gold": "$185",
+      "prediction": "$185",
+      "correct": true,
+      "latency_s": 34.27568602561951
+    },
+    {
+      "question_id": "aae3761f",
+      "question_type": "multi-session",
+      "question": "How many hours in total did I spend driving to my three road trip destinations combined?",
+      "gold": "15 hours for getting to the three destinations (or 30 hours for the round trip)",
+      "prediction": "10 hours",
+      "correct": false,
+      "latency_s": 38.146939277648926
+    },
+    {
+      "question_id": "gpt4_f2262a51",
+      "question_type": "multi-session",
+      "question": "How many different doctors did I visit?",
+      "gold": "I visited three different doctors: a primary care physician, an ENT specialist, and a dermatologist.",
+      "prediction": "4",
+      "correct": false,
+      "latency_s": 31.493626356124878
+    },
+    {
+      "question_id": "dd2973ad",
+      "question_type": "multi-session",
+      "question": "What time did I go to bed on the day before I had a doctor's appointment?",
+      "gold": "2 AM",
+      "prediction": "2 AM",
+      "correct": true,
+      "latency_s": 29.79191517829895
+    },
+    {
+      "question_id": "c4a1ceb8",
+      "question_type": "multi-session",
+      "question": "How many different types of citrus fruits have I used in my cocktail recipes?",
+      "gold": "3",
+      "prediction": "4",
+      "correct": false,
+      "latency_s": 37.933940410614014
+    },
+    {
+      "question_id": "gpt4_a56e767c",
+      "question_type": "multi-session",
+      "question": "How many movie festivals that I attended?",
+      "gold": "I attended four movie festivals.",
+      "prediction": "2",
+      "correct": false,
+      "latency_s": 29.08753752708435
+    },
+    {
+      "question_id": "6cb6f249",
+      "question_type": "multi-session",
+      "question": "How many days did I take social media breaks in total?",
+      "gold": "17 days",
+      "prediction": "17 days",
+      "correct": true,
+      "latency_s": 30.45646834373474
+    },
+    {
+      "question_id": "46a3abf7",
+      "question_type": "multi-session",
+      "question": "How many tanks do I currently have, including the one I set up for my friend's kid?",
+      "gold": "3",
+      "prediction": "3",
+      "correct": true,
+      "latency_s": 179.03074860572815
+    },
+    {
+      "question_id": "36b9f61e",
+      "question_type": "multi-session",
+      "question": "What is the total amount I spent on luxury items in the past few months?",
+      "gold": "$2,500",
+      "prediction": "$2,500",
+      "correct": true,
+      "latency_s": 181.53747940063477
+    },
+    {
+      "question_id": "28dc39ac",
+      "question_type": "multi-session",
+      "question": "How many hours have I spent playing games in total?",
+      "gold": "140 hours",
+      "prediction": "70 hours",
+      "correct": false,
+      "latency_s": 38.373724699020386
+    },
+    {
+      "question_id": "gpt4_2f8be40d",
+      "question_type": "multi-session",
+      "question": "How many weddings have I attended in this year?",
+      "gold": "I attended three weddings. The couples were Rachel and Mike, Emily and Sarah, and Jen and Tom.",
+      "prediction": "3",
+      "correct": true,
+      "latency_s": 32.82344698905945
+    },
+    {
+      "question_id": "2e6d26dc",
+      "question_type": "multi-session",
+      "question": "How many babies were born to friends and family members in the last few months?",
+      "gold": "5",
+      "prediction": "5",
+      "correct": true,
+      "latency_s": 25.87910795211792
+    },
+    {
+      "question_id": "gpt4_15e38248",
+      "question_type": "multi-session",
+      "question": "How many pieces of furniture did I buy, assemble, sell, or fix in the past few months?",
+      "gold": "4",
+      "prediction": "4",
+      "correct": true,
+      "latency_s": 35.223941802978516
+    }
+  ],
+  "_partial": true
+}
