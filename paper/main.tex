@@ -35,7 +35,6 @@
 
 \pgfplotsset{compat=1.18}
 
-
 \emergencystretch=10em
 \hbadness=10000
 \vbadness=10000
@@ -577,19 +576,19 @@ Table~\ref{tab:longmem-oracle} reports per-category accuracy on the LongMemEval 
     \label{tab:longmem-oracle}
     \begin{tabular}{@{}lrr@{}}
         \toprule
-        \textbf{Question Category}    & \textbf{n} & \textbf{Accuracy}                                         \\
+        \textbf{Question Category}    & \textbf{n} & \textbf{Accuracy}                                 \\
         \midrule
-        single-session-assistant      & 56         & \textbf{100.0\%}                                          \\
-        single-session-user           & 70         & 88.6\%                                                    \\
-        knowledge-update              & 78         & 83.3\%                                                    \\
-        temporal-reasoning            & 133        & 81.2\%                                                    \\
-        multi-session                 & 133        & 75.2\%                                                    \\
-        single-session-preference     & 30         & 53.3\%$^{\dagger}$                                        \\
+        single-session-assistant      & 56         & \textbf{100.0\%}                                  \\
+        single-session-user           & 70         & 88.6\%                                            \\
+        knowledge-update              & 78         & 83.3\%                                            \\
+        temporal-reasoning            & 133        & 81.2\%                                            \\
+        multi-session                 & 133        & 75.2\%                                            \\
+        single-session-preference     & 30         & 53.3\%$^{\dagger}$                                \\
         \midrule
-        Factual subset (5 categories) & 470        & 83.2\%                                                    \\
-        \textbf{Overall (all 6)}      & 500        & \textbf{81.4\%}                                           \\
+        Factual subset (5 categories) & 470        & 83.2\%                                            \\
+        \textbf{Overall (all 6)}      & 500        & \textbf{81.4\%}                                   \\
         \bottomrule
-        \multicolumn{3}{@{}l}{\footnotesize $^{\dagger}$ Rubric-judge score; the strict factual judge}            \\
+        \multicolumn{3}{@{}l}{\footnotesize $^{\dagger}$ Rubric-judge score; the strict factual judge} \\
         \multicolumn{3}{@{}l}{\footnotesize \quad scored this category at 6.7\% (see \S VI-E).}
     \end{tabular}
 \end{table}
@@ -615,17 +614,17 @@ Table~\ref{tab:longmem-s} reports per-category accuracy on \texttt{s\_cleaned} u
     \label{tab:longmem-s}
     \begin{tabular}{@{}lrrl@{}}
         \toprule
-        \textbf{Question Category}    & \textbf{n} & \textbf{Accuracy} & \textbf{Status} \\
+        \textbf{Question Category}    & \textbf{n} & \textbf{Accuracy}           & \textbf{Status}       \\
         \midrule
-        single-session-user           & 70         & 81.4\%            & observed (full) \\
-        multi-session                 & 133        & 68.4\%            & observed ($n$=19/133) \\
-        single-session-assistant      & 56         & ${\sim}\,$95\%    & projected       \\
-        knowledge-update              & 78         & ${\sim}\,$77\%    & projected       \\
-        temporal-reasoning            & 133        & ${\sim}\,$74\%    & projected       \\
-        single-session-preference     & 30         & ${\sim}\,$53\%    & projected       \\
+        single-session-user           & 70         & 81.4\%                      & observed (full)       \\
+        multi-session                 & 133        & 68.4\%                      & observed ($n$=19/133) \\
+        single-session-assistant      & 56         & ${\sim}\,$95\%              & projected             \\
+        knowledge-update              & 78         & ${\sim}\,$77\%              & projected             \\
+        temporal-reasoning            & 133        & ${\sim}\,$74\%              & projected             \\
+        single-session-preference     & 30         & ${\sim}\,$53\%              & projected             \\
         \midrule
-        Factual subset (5 categories) & 470        & ${\sim}\,$78\%    & blended         \\
-        \textbf{Overall (all 6)}      & 500        & \textbf{${\sim}\,$75--76\%} & blended \\
+        Factual subset (5 categories) & 470        & ${\sim}\,$78\%              & blended               \\
+        \textbf{Overall (all 6)}      & 500        & \textbf{${\sim}\,$75--76\%} & blended               \\
         \bottomrule
     \end{tabular}
 \end{table}
